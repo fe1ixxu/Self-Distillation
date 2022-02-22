@@ -30,7 +30,7 @@ from .lightweight_convolution import LightweightConv, LightweightConv1dTBC
 from .linearized_convolution import LinearizedConvolution
 from .location_attention import LocationAttention
 from .lstm_cell_with_zoneout import LSTMCellWithZoneOut
-from .multihead_attention import MultiheadAttention
+from .multihead_attention import MultiheadAttention, MultiheadAttentionIN
 from .positional_embedding import PositionalEmbedding
 from .same_pad import SamePad
 from .scalar_bias import ScalarBias
@@ -50,6 +50,8 @@ from .rotary_positional_embedding import RotaryPositionalEmbedding
 from .positional_encoding import (
     RelPositionalEncoding,
 )
+from .mixture_of_experts import MoE, HeirarchicalMoE, Experts
+from .attention_forward import multi_head_attention_forward
 
 __all__ = [
     "AdaptiveInput",
@@ -84,6 +86,7 @@ __all__ = [
     "LocationAttention",
     "LSTMCellWithZoneOut",
     "MultiheadAttention",
+    "MultiheadAttentionIN",
     "PositionalEmbedding",
     "SamePad",
     "ScalarBias",
