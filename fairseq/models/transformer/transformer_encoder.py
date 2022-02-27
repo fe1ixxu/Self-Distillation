@@ -414,7 +414,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layer_norm = None
         
         self.iterative_normalization = cfg.iterative_normalization
-        self.switcher = cfg.switcher
+        self.switcher = cfg.switcher_proj or cfg.switcher_fc
 
     def build_encoder_layer(self, cfg):
         layer = transformer_layer.TransformerEncoderLayerBaseIN(
@@ -587,7 +587,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "encoder_embedding": [encoder_embedding],  # B x T x C
             "encoder_states": encoder_states,  # List[T x B x C]
             "fc_results": fc_results,  # List[T x B x C]
-            "src_tokens": [src_tokens],
+            "src_tokens": [],
             "src_lengths": [src_lengths],
             "ind_start_without_pad": [ind_start_without_pad],
         }

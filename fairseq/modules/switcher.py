@@ -9,7 +9,7 @@ class Switcher(nn.Module):
         self.w1 = nn.Linear(input_dim, input_dim)
         self.w2 = nn.Linear(input_dim, output_dim)
 
-    def forward(self, x, model, ind_start_without_pad=None, batch_training=True, printout=False):
+    def forward(self, x, model, ind_start_without_pad=None, batch_training=True):
         """
         x: [seq_len, bz, dim] Take the first index of feature as input
         dim1: input dim

@@ -227,7 +227,9 @@ class TransformerModelIN(TransformerModelBaseIN):
                             help='Number of Experts for kqv projection')
         parser.add_argument('--expert_type', type=str, metavar='N', default="none", choices=["proj", "ffn", "both", "none"], \
                             help='The type of Experts')
-        parser.add_argument('--switcher', type=int, metavar='N', default=0, \
+        parser.add_argument('--switcher-proj', type=int, metavar='N', default=0, \
+                            help='Whether we use switchers')
+        parser.add_argument('--switcher-fc', type=int, metavar='N', default=0, \
                             help='Whether we use switchers')
 
     @classmethod

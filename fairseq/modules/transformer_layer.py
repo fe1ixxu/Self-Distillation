@@ -591,7 +591,8 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         self.cfg = cfg
         self.expert_num = cfg.expert_num
         self.expert_type = cfg.expert_type
-        self.switcher = cfg.switcher
+        self.switcher_proj = cfg.switcher_proj
+        self.switcher_fc = cfg.switcher_fc
         self.return_fc = return_fc
         self.embed_dim = cfg.encoder.embed_dim
         self.quant_noise = cfg.quant_noise.pq
@@ -623,7 +624,9 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             self.quant_noise_block_size,
         )
         
-        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher else None
+        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher_proj else None
+        self.switcher_fc1 = Switcher(self.embed_dim, cfg.decoder.ffn_embed_dim) if self.switcher_fc else None
+        self.switcher_fc2 = Switcher(cfg.decoder.ffn_embed_dim, self.embed_dim) if self.switcher_fc else None
 
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
@@ -670,6 +673,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         return sorted(
             range(len(f1_filter_param)), key=lambda k: f1_filter_param[k], reverse=False
         )[0:remove_num]
+        raise ValueError("Not for _get_fc_rank")
 
     def _prune_fc_layer(self, remove_index: List[int]):
         new_fc1_weight = []
@@ -713,6 +717,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         )
         self.fc2.weight = torch.nn.Parameter(new_fc2_weight)
         self.fc2.bias = torch.nn.Parameter(new_fc2_bias)
+        raise ValueError("Not for _prune_fc_layer")
 
     def build_self_attention(self, embed_dim, cfg):
         if self.expert_type in ["proj", "both"]:
@@ -808,9 +813,10 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
 
-        x = self.activation_fn(self.fc1(x))
+        x = self.switcher_fc1(x, self.fc1, ind_start_without_pad=ind_start_without_pad) if self.switcher_fc else self.fc1(x)
+        x = self.activation_fn(x)
         x = self.activation_dropout_module(x)
-        x = self.fc2(x)
+        x = self.switcher_fc2(x, self.fc2, ind_start_without_pad=ind_start_without_pad)if self.switcher_fc else self.fc2(x)
 
         fc_result = x
 
@@ -847,7 +853,8 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self.embed_dim = cfg.decoder.embed_dim
         self.expert_num = cfg.expert_num
         self.expert_type = cfg.expert_type
-        self.switcher = cfg.switcher
+        self.switcher_proj = cfg.switcher_proj
+        self.switcher_fc = cfg.switcher_fc
         self.dropout_module = FairseqDropout(
             cfg.dropout, module_name=self.__class__.__name__
         )
@@ -923,7 +930,10 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             self.quant_noise,
             self.quant_noise_block_size,
         )
-        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher else None
+        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher_proj else None
+        self.switcher_fc1 = Switcher(self.embed_dim, cfg.decoder.ffn_embed_dim) if self.switcher_fc else None
+        self.switcher_fc2 = Switcher(cfg.decoder.ffn_embed_dim, self.embed_dim) if self.switcher_fc else None
+        
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
         self.need_attn = True
 
