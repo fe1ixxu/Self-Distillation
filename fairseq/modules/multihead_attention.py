@@ -756,22 +756,28 @@ class MultiheadAttentionIN(nn.Module):
         self.onnx_trace = True
 
     def reset_parameters(self):
-        if self.qkv_same_dim:
-            # Empirically observed the convergence to be much better with
-            # the scaled initialization
-            nn.init.xavier_uniform_(self.k_proj.experts.W, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.v_proj.experts.W, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.q_proj.experts.W, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.k_proj.experts.bias, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.v_proj.experts.bias, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.q_proj.experts.bias, gain=1 / math.sqrt(2))
+        if self.expert_num > 1:
+            if self.qkv_same_dim:
+                # Empirically observed the convergence to be much better with
+                # the scaled initialization
+                nn.init.xavier_uniform_(self.k_proj.experts.W, gain=1 / math.sqrt(2))
+                nn.init.xavier_uniform_(self.v_proj.experts.W, gain=1 / math.sqrt(2))
+                nn.init.xavier_uniform_(self.q_proj.experts.W, gain=1 / math.sqrt(2))
+            else:
+                nn.init.xavier_uniform_(self.k_proj.experts.W)
+                nn.init.xavier_uniform_(self.v_proj.experts.W)
+                nn.init.xavier_uniform_(self.q_proj.experts.W)
         else:
-            nn.init.xavier_uniform_(self.k_proj.experts.W)
-            nn.init.xavier_uniform_(self.v_proj.experts.W)
-            nn.init.xavier_uniform_(self.q_proj.experts.W)
-            nn.init.xavier_uniform_(self.k_proj.experts.bias)
-            nn.init.xavier_uniform_(self.v_proj.experts.bias)
-            nn.init.xavier_uniform_(self.q_proj.experts.bias)
+            if self.qkv_same_dim:
+                # Empirically observed the convergence to be much better with
+                # the scaled initialization
+                nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
+                nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
+                nn.init.xavier_uniform_(self.q_proj.weight, gain=1 / math.sqrt(2))
+            else:
+                nn.init.xavier_uniform_(self.k_proj.weight)
+                nn.init.xavier_uniform_(self.v_proj.weight)
+                nn.init.xavier_uniform_(self.q_proj.weight)
 
         nn.init.xavier_uniform_(self.out_proj.weight)
         if self.out_proj.bias is not None:
@@ -781,130 +787,130 @@ class MultiheadAttentionIN(nn.Module):
         if self.bias_v is not None:
             nn.init.xavier_normal_(self.bias_v)
 
-    # def _get_reserve_head_index(self, num_heads_to_keep: int):
-    #     k_proj_heads_norm = []
-    #     q_proj_heads_norm = []
-    #     v_proj_heads_norm = []
+    def _get_reserve_head_index(self, num_heads_to_keep: int):
+        k_proj_heads_norm = []
+        q_proj_heads_norm = []
+        v_proj_heads_norm = []
 
-    #     for i in range(self.num_heads):
-    #         start_idx = i * self.head_dim
-    #         end_idx = (i + 1) * self.head_dim
-    #         k_proj_heads_norm.append(
-    #             torch.sum(
-    #                 torch.abs(
-    #                     self.k_proj.weight[
-    #                         start_idx:end_idx,
-    #                     ]
-    #                 )
-    #             ).tolist()
-    #             + torch.sum(torch.abs(self.k_proj.bias[start_idx:end_idx])).tolist()
-    #         )
-    #         q_proj_heads_norm.append(
-    #             torch.sum(
-    #                 torch.abs(
-    #                     self.q_proj.weight[
-    #                         start_idx:end_idx,
-    #                     ]
-    #                 )
-    #             ).tolist()
-    #             + torch.sum(torch.abs(self.q_proj.bias[start_idx:end_idx])).tolist()
-    #         )
-    #         v_proj_heads_norm.append(
-    #             torch.sum(
-    #                 torch.abs(
-    #                     self.v_proj.weight[
-    #                         start_idx:end_idx,
-    #                     ]
-    #                 )
-    #             ).tolist()
-    #             + torch.sum(torch.abs(self.v_proj.bias[start_idx:end_idx])).tolist()
-    #         )
+        for i in range(self.num_heads):
+            start_idx = i * self.head_dim
+            end_idx = (i + 1) * self.head_dim
+            k_proj_heads_norm.append(
+                torch.sum(
+                    torch.abs(
+                        self.k_proj.weight[
+                            start_idx:end_idx,
+                        ]
+                    )
+                ).tolist()
+                + torch.sum(torch.abs(self.k_proj.bias[start_idx:end_idx])).tolist()
+            )
+            q_proj_heads_norm.append(
+                torch.sum(
+                    torch.abs(
+                        self.q_proj.weight[
+                            start_idx:end_idx,
+                        ]
+                    )
+                ).tolist()
+                + torch.sum(torch.abs(self.q_proj.bias[start_idx:end_idx])).tolist()
+            )
+            v_proj_heads_norm.append(
+                torch.sum(
+                    torch.abs(
+                        self.v_proj.weight[
+                            start_idx:end_idx,
+                        ]
+                    )
+                ).tolist()
+                + torch.sum(torch.abs(self.v_proj.bias[start_idx:end_idx])).tolist()
+            )
 
-    #     heads_norm = []
-    #     for i in range(self.num_heads):
-    #         heads_norm.append(
-    #             k_proj_heads_norm[i] + q_proj_heads_norm[i] + v_proj_heads_norm[i]
-    #         )
+        heads_norm = []
+        for i in range(self.num_heads):
+            heads_norm.append(
+                k_proj_heads_norm[i] + q_proj_heads_norm[i] + v_proj_heads_norm[i]
+            )
 
-    #     sorted_head_index = sorted(
-    #         range(self.num_heads), key=lambda k: heads_norm[k], reverse=True
-    #     )
-    #     reserve_head_index = []
-    #     for i in range(num_heads_to_keep):
-    #         start = sorted_head_index[i] * self.head_dim
-    #         end = (sorted_head_index[i] + 1) * self.head_dim
-    #         reserve_head_index.append((start, end))
-    #     return reserve_head_index
+        sorted_head_index = sorted(
+            range(self.num_heads), key=lambda k: heads_norm[k], reverse=True
+        )
+        reserve_head_index = []
+        for i in range(num_heads_to_keep):
+            start = sorted_head_index[i] * self.head_dim
+            end = (sorted_head_index[i] + 1) * self.head_dim
+            reserve_head_index.append((start, end))
+        return reserve_head_index
 
-    # def _adaptive_prune_heads(self, reserve_head_index: List[Tuple[int, int]]):
-    #     new_q_weight = []
-    #     new_q_bias = []
-    #     new_k_weight = []
-    #     new_k_bias = []
-    #     new_v_weight = []
-    #     new_v_bias = []
-    #     new_out_proj_weight = []
+    def _adaptive_prune_heads(self, reserve_head_index: List[Tuple[int, int]]):
+        new_q_weight = []
+        new_q_bias = []
+        new_k_weight = []
+        new_k_bias = []
+        new_v_weight = []
+        new_v_bias = []
+        new_out_proj_weight = []
 
-    #     for ele in reserve_head_index:
-    #         start_idx, end_idx = ele
-    #         new_q_weight.append(
-    #             self.q_proj.weight[
-    #                 start_idx:end_idx,
-    #             ]
-    #         )
-    #         new_q_bias.append(self.q_proj.bias[start_idx:end_idx])
+        for ele in reserve_head_index:
+            start_idx, end_idx = ele
+            new_q_weight.append(
+                self.q_proj.weight[
+                    start_idx:end_idx,
+                ]
+            )
+            new_q_bias.append(self.q_proj.bias[start_idx:end_idx])
 
-    #         new_k_weight.append(
-    #             self.k_proj.weight[
-    #                 start_idx:end_idx,
-    #             ]
-    #         )
+            new_k_weight.append(
+                self.k_proj.weight[
+                    start_idx:end_idx,
+                ]
+            )
 
-    #         new_k_bias.append(self.k_proj.bias[start_idx:end_idx])
+            new_k_bias.append(self.k_proj.bias[start_idx:end_idx])
 
-    #         new_v_weight.append(
-    #             self.v_proj.weight[
-    #                 start_idx:end_idx,
-    #             ]
-    #         )
-    #         new_v_bias.append(self.v_proj.bias[start_idx:end_idx])
+            new_v_weight.append(
+                self.v_proj.weight[
+                    start_idx:end_idx,
+                ]
+            )
+            new_v_bias.append(self.v_proj.bias[start_idx:end_idx])
 
-    #         new_out_proj_weight.append(self.out_proj.weight[:, start_idx:end_idx])
+            new_out_proj_weight.append(self.out_proj.weight[:, start_idx:end_idx])
 
-    #     new_q_weight = torch.cat(new_q_weight).detach()
-    #     new_k_weight = torch.cat(new_k_weight).detach()
-    #     new_v_weight = torch.cat(new_v_weight).detach()
-    #     new_out_proj_weight = torch.cat(new_out_proj_weight, dim=-1).detach()
-    #     new_q_weight.requires_grad = True
-    #     new_k_weight.requires_grad = True
-    #     new_v_weight.requires_grad = True
-    #     new_out_proj_weight.requires_grad = True
+        new_q_weight = torch.cat(new_q_weight).detach()
+        new_k_weight = torch.cat(new_k_weight).detach()
+        new_v_weight = torch.cat(new_v_weight).detach()
+        new_out_proj_weight = torch.cat(new_out_proj_weight, dim=-1).detach()
+        new_q_weight.requires_grad = True
+        new_k_weight.requires_grad = True
+        new_v_weight.requires_grad = True
+        new_out_proj_weight.requires_grad = True
 
-    #     new_q_bias = torch.cat(new_q_bias).detach()
-    #     new_q_bias.requires_grad = True
+        new_q_bias = torch.cat(new_q_bias).detach()
+        new_q_bias.requires_grad = True
 
-    #     new_k_bias = torch.cat(new_k_bias).detach()
-    #     new_k_bias.requires_grad = True
+        new_k_bias = torch.cat(new_k_bias).detach()
+        new_k_bias.requires_grad = True
 
-    #     new_v_bias = torch.cat(new_v_bias).detach()
-    #     new_v_bias.requires_grad = True
+        new_v_bias = torch.cat(new_v_bias).detach()
+        new_v_bias.requires_grad = True
 
-    #     self.q_proj.weight = torch.nn.Parameter(new_q_weight)
-    #     self.q_proj.bias = torch.nn.Parameter(new_q_bias)
+        self.q_proj.weight = torch.nn.Parameter(new_q_weight)
+        self.q_proj.bias = torch.nn.Parameter(new_q_bias)
 
-    #     self.k_proj.weight = torch.nn.Parameter(new_k_weight)
-    #     self.k_proj.bias = torch.nn.Parameter(new_k_bias)
+        self.k_proj.weight = torch.nn.Parameter(new_k_weight)
+        self.k_proj.bias = torch.nn.Parameter(new_k_bias)
 
-    #     self.v_proj.weight = torch.nn.Parameter(new_v_weight)
-    #     self.v_proj.bias = torch.nn.Parameter(new_v_bias)
+        self.v_proj.weight = torch.nn.Parameter(new_v_weight)
+        self.v_proj.bias = torch.nn.Parameter(new_v_bias)
 
-    #     self.out_proj.weight = torch.nn.Parameter(new_out_proj_weight)
+        self.out_proj.weight = torch.nn.Parameter(new_out_proj_weight)
 
-    #     self.num_heads = len(reserve_head_index)
-    #     self.embed_dim = self.head_dim * self.num_heads
-    #     self.q_proj.out_features = self.embed_dim
-    #     self.k_proj.out_features = self.embed_dim
-    #     self.v_proj.out_features = self.embed_dim
+        self.num_heads = len(reserve_head_index)
+        self.embed_dim = self.head_dim * self.num_heads
+        self.q_proj.out_features = self.embed_dim
+        self.k_proj.out_features = self.embed_dim
+        self.v_proj.out_features = self.embed_dim
 
     def _set_skip_embed_dim_check(self):
         self.skip_embed_dim_check = True
@@ -921,6 +927,9 @@ class MultiheadAttentionIN(nn.Module):
         attn_mask: Optional[Tensor] = None,
         before_softmax: bool = False,
         need_head_weights: bool = False,
+        switcher=None,
+        ind_start_without_pad=None,
+        itype=None,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Input shape: Time x Batch x Channel
 
@@ -973,6 +982,7 @@ class MultiheadAttentionIN(nn.Module):
             and not self.skip_embed_dim_check
         ):
             assert key is not None and value is not None
+            # print(f"{itype} get in place A")
             return multi_head_attention_forward(
                 query,
                 key,
@@ -994,6 +1004,8 @@ class MultiheadAttentionIN(nn.Module):
                 q_proj_weight=self.q_proj,
                 k_proj_weight=self.k_proj,
                 v_proj_weight=self.v_proj,
+                switcher=switcher,
+                ind_start_without_pad=ind_start_without_pad,
             )
 
         if incremental_state is not None:
@@ -1008,24 +1020,30 @@ class MultiheadAttentionIN(nn.Module):
             saved_state = None
 
         if self.self_attention:
-            q = self.q_proj(query)
-            k = self.k_proj(query)
-            v = self.v_proj(query)
+            # print(f"{itype} get in place B")
+            assert ind_start_without_pad == None
+            q = switcher(query, self.q_proj, ind_start_without_pad) if switcher else self.q_proj(query)
+            k = switcher(query, self.k_proj, ind_start_without_pad) if switcher else self.k_proj(query)
+            v = switcher(query, self.v_proj, ind_start_without_pad) if switcher else self.v_proj(query)
+
         elif self.encoder_decoder_attention:
-            # encoder-decoder attention
-            q = self.q_proj(query)
+            # print(f"{itype} get in place C {key is None}")
+            q = switcher(query, self.q_proj, ind_start_without_pad=None) if switcher else self.q_proj(query)
             if key is None:
                 assert value is None
                 k = v = None
             else:
-                k = self.k_proj(key)
-                v = self.v_proj(key)
+                # print(f"{itype} get in place E")
+                k = switcher(key, self.k_proj, ind_start_without_pad) if switcher else self.k_proj(key)
+                v = switcher(key, self.v_proj, ind_start_without_pad) if switcher else self.v_proj(key)
 
         else:
+            # print(f"{itype} get in place D")
+            raise ValueError("Code base does not support this case!")
             assert key is not None and value is not None
-            q = self.q_proj(query)
-            k = self.k_proj(key)
-            v = self.v_proj(value)
+            q = switcher(query, self.q_proj, ind_start_without_pad) if switcher else self.q_proj(query)
+            k = switcher(key, self.k_proj, ind_start_without_pad) if switcher else self.k_proj(key)
+            v = switcher(value, self.v_proj, ind_start_without_pad) if switcher else self.v_proj(value)
         q *= self.scaling
 
         if self.bias_k is not None:

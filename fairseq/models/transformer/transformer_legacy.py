@@ -2,7 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
+from typing import Dict, List, Optional, Tuple
 from fairseq.dataclass.utils import gen_parser_from_dataclass
 from fairseq.models import (
     register_model,
@@ -225,8 +225,10 @@ class TransformerModelIN(TransformerModelBaseIN):
                             help='Pass this field to enable iterative normalization with the declared number')
         parser.add_argument('--expert_num', type=int, metavar='N', default=1, \
                             help='Number of Experts for kqv projection')
-        parser.add_argument('--expert_type', type=str, metavar='N', default="proj", choices=["proj", "ffn", "both"], \
+        parser.add_argument('--expert_type', type=str, metavar='N', default="none", choices=["proj", "ffn", "both", "none"], \
                             help='The type of Experts')
+        parser.add_argument('--switcher', type=int, metavar='N', default=0, \
+                            help='Whether we use switchers')
 
     @classmethod
     def build_model(cls, args, task):
@@ -289,7 +291,6 @@ class TransformerModelIN(TransformerModelBaseIN):
         return super().build_decoder(
             TransformerConfig.from_namespace(args), tgt_dict, embed_tokens
         )
-
 # architectures
 
 

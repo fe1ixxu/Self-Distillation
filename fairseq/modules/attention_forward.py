@@ -482,6 +482,8 @@ def multi_head_attention_forward(
     static_k: Optional[Tensor] = None,
     static_v: Optional[Tensor] = None,
     average_attn_weights: bool = True,
+    switcher=None,
+    ind_start_without_pad=None,
 ) -> Tuple[Tensor, Optional[Tensor]]:
     r"""
     Args:
@@ -583,9 +585,9 @@ def multi_head_attention_forward(
     assert q_proj_weight is not None, "use_separate_proj_weight is True but q_proj_weight is None"
     assert k_proj_weight is not None, "use_separate_proj_weight is True but k_proj_weight is None"
     assert v_proj_weight is not None, "use_separate_proj_weight is True but v_proj_weight is None"
-    q = q_proj_weight(query)
-    k = k_proj_weight(key)
-    v = v_proj_weight(value)
+    q = switcher(query, q_proj_weight, ind_start_without_pad) if switcher else q_proj_weight(query)
+    k = switcher(key, k_proj_weight, ind_start_without_pad) if switcher else k_proj_weight(key)
+    v = switcher(value, v_proj_weight, ind_start_without_pad) if switcher else v_proj_weight(value)
 
     # prep attention mask
     if attn_mask is not None:

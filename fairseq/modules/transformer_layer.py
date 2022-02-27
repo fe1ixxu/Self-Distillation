@@ -16,7 +16,7 @@ from fairseq.models.transformer import (
     TransformerConfig,
 )
 from fairseq.modules.mixture_of_experts import MoE
-
+from fairseq.modules.switcher import Switcher
 
 class TransformerEncoderLayerBase(nn.Module):
     """Encoder layer block.
@@ -591,6 +591,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         self.cfg = cfg
         self.expert_num = cfg.expert_num
         self.expert_type = cfg.expert_type
+        self.switcher = cfg.switcher
         self.return_fc = return_fc
         self.embed_dim = cfg.encoder.embed_dim
         self.quant_noise = cfg.quant_noise.pq
@@ -621,6 +622,8 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             self.quant_noise,
             self.quant_noise_block_size,
         )
+        
+        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher else None
 
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
@@ -755,6 +758,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         x,
         encoder_padding_mask: Optional[Tensor],
         attn_mask: Optional[Tensor] = None,
+        ind_start_without_pad = None,
     ):
         """
         Args:
@@ -791,6 +795,9 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             key_padding_mask=encoder_padding_mask,
             need_weights=False,
             attn_mask=attn_mask,
+            switcher=self.switcher_proj,
+            ind_start_without_pad=ind_start_without_pad,
+            itype="encoder_att",
         )
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
@@ -840,6 +847,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self.embed_dim = cfg.decoder.embed_dim
         self.expert_num = cfg.expert_num
         self.expert_type = cfg.expert_type
+        self.switcher = cfg.switcher
         self.dropout_module = FairseqDropout(
             cfg.dropout, module_name=self.__class__.__name__
         )
@@ -915,7 +923,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             self.quant_noise,
             self.quant_noise_block_size,
         )
-
+        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher else None
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
         self.need_attn = True
 
@@ -1024,6 +1032,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self_attn_padding_mask: Optional[torch.Tensor] = None,
         need_attn: bool = False,
         need_head_weights: bool = False,
+        ind_start_without_pad = None,
     ):
         """
         Args:
@@ -1087,6 +1096,8 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             incremental_state=incremental_state,
             need_weights=False,
             attn_mask=self_attn_mask,
+            switcher=self.switcher_proj,
+            itype="decoder_self_att",
         )
         if self.c_attn is not None:
             tgt_len, bsz = x.size(0), x.size(1)
@@ -1124,6 +1135,9 @@ class TransformerDecoderLayerBaseIN(nn.Module):
                 static_kv=True,
                 need_weights=need_attn or (not self.training and self.need_attn),
                 need_head_weights=need_head_weights,
+                switcher=self.switcher_proj,
+                ind_start_without_pad=ind_start_without_pad,
+                itype="decoder_cross_att",
             )
             x = self.dropout_module(x)
             x = self.residual_connection(x, residual)

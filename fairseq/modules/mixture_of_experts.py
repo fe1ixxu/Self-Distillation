@@ -253,6 +253,8 @@ class MoE(nn.Module):
         self.loss_coef = loss_coef
 
     def forward(self, inputs, **kwargs):
+        if self.num_experts <=1 :
+            return self.experts(inputs)
         b, n, d, e = *inputs.shape, self.num_experts
         dispatch_tensor, combine_tensor, loss = self.gate(inputs)
         expert_inputs = torch.einsum('bnd,bnec->ebcd', inputs, dispatch_tensor)

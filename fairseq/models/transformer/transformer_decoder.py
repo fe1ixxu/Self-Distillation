@@ -725,6 +725,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
                 - the decoder's features of shape `(batch, tgt_len, embed_dim)`
                 - a dictionary with any model-specific outputs
         """
+        # print(f"encoder reordered src_tokens {encoder_out['src_tokens'][0][:,:20]}, {encoder_out['ind_start_without_pad'][0]}")
         bs, slen = prev_output_tokens.size()
         if alignment_layer is None:
             alignment_layer = self.num_layers - 1
@@ -778,6 +779,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         # decoder layers
         attn: Optional[Tensor] = None
         inner_states: List[Optional[Tensor]] = [x]
+        ind_start_without_pad = encoder_out["ind_start_without_pad"][0]
         for idx, layer in enumerate(self.layers):
             if incremental_state is None and not full_context_alignment:
                 self_attn_mask = self.buffered_future_mask(x)
@@ -793,6 +795,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
                 self_attn_padding_mask=self_attn_padding_mask,
                 need_attn=bool((idx == alignment_layer)),
                 need_head_weights=bool((idx == alignment_layer)),
+                ind_start_without_pad=ind_start_without_pad,
             )
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:

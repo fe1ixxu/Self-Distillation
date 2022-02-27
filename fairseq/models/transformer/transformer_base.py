@@ -274,7 +274,7 @@ class TransformerModelBaseIN(FairseqEncoderDecoderModel):
 
     @classmethod
     def build_decoder(cls, cfg, tgt_dict, embed_tokens):
-        return TransformerDecoderBaseIN(
+        return TransformerDecoderBase(
             cfg,
             tgt_dict,
             embed_tokens,
