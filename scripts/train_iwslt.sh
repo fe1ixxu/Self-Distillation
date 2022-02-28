@@ -79,10 +79,25 @@ fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task
 --langs ar,es,en,he,nl,pt,ru,tr,de,fa,it,pl,ro,sl,zh \
 --lang-pairs ar-en,es-en,he-en,nl-en,pt-en,ru-en,tr-en,de-en,fa-en,it-en,pl-en,ro-en,sl-en,zh-en \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
---lr-scheduler inverse_sqrt --lr 0.0004 --warmup-updates 2000 --max-update 60000 --dropout 0.1 --attention-dropout 0.1 \
+--lr-scheduler inverse_sqrt --lr 0.0004 --warmup-updates 2000 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
 --weight-decay 0.0 --max-tokens 1024 --update-freq 16 --patience 5 \
---save-interval-updates 1000 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 500 \
+--save-interval-updates 1000 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
 --ddp-backend no_c10d --fp16  \
 --save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
 --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
 --iterative-normalization 0 --expert_num 1 --expert_type proj --switcher-proj 1 --switcher-fc 1
+
+
+SAVE_DIR=../checkpoints/iwslt_base_test2/many-to-one/
+fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
+--sampling-method temperature --sampling-temperature 2 --encoder-langtok tgt \
+--langs ar,es,en,he,nl,pt,ru,tr,de,fa,it,pl,ro,sl,zh \
+--lang-pairs ar-en,es-en,he-en,nl-en,pt-en,ru-en,tr-en,de-en,fa-en,it-en,pl-en,ro-en,sl-en,zh-en \
+--criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+--lr-scheduler inverse_sqrt --lr 0.0004 --warmup-updates 2000 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
+--weight-decay 0.0 --max-tokens 1024 --update-freq 16 --patience 5 \
+--save-interval-updates 1000 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
+--ddp-backend no_c10d --fp16  \
+--save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
+--skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
+--iterative-normalization 0 --expert_num 1 --expert_type proj --switcher-proj 0 --switcher-fc 0

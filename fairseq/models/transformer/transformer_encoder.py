@@ -641,7 +641,10 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         if len(encoder_out["ind_start_without_pad"]) == 0:
             ind_start_without_pad = []
         else:
-            ind_start_without_pad = [(encoder_out["ind_start_without_pad"][0]).index_select(0, new_order)]
+            if encoder_out["ind_start_without_pad"][0] is not None:
+                ind_start_without_pad = [(encoder_out["ind_start_without_pad"][0]).index_select(0, new_order)]
+            else:
+                ind_start_without_pad = [None]
 
         encoder_states = encoder_out["encoder_states"]
         if len(encoder_states) > 0:
