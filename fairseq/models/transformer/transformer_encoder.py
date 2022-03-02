@@ -404,7 +404,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         else:
             self.layers = nn.ModuleList([])
         self.layers.extend(
-            [self.build_encoder_layer(cfg) for i in range(cfg.encoder.layers)]
+            [self.build_encoder_layer(cfg, dictionary) for i in range(cfg.encoder.layers)]
         )
         self.num_layers = len(self.layers)
 
@@ -416,9 +416,9 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         self.iterative_normalization = cfg.iterative_normalization
         self.switcher = cfg.switcher_proj or cfg.switcher_fc
 
-    def build_encoder_layer(self, cfg):
+    def build_encoder_layer(self, cfg, dictionary):
         layer = transformer_layer.TransformerEncoderLayerBaseIN(
-            cfg, return_fc=self.return_fc
+            cfg, dictionary, return_fc=self.return_fc
         )
         checkpoint = cfg.checkpoint_activations
         if checkpoint:
@@ -515,15 +515,8 @@ class TransformerEncoderBaseIN(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         # compute padding mask
-        # print("src tokens front: ", src_tokens[:,:10])
-        # print("src tokens back: ", src_tokens[:,-10:])
-        # print((src_tokens==self.padding_idx).nonzero())
-        # print(self.switcher and not self.training)
-        # exit(0)
-        if self.switcher and not self.training:
-            _, ind_start_without_pad = (src_tokens - self.padding_idx == 0).type(src_tokens.dtype).min(dim=-1)
-        else:
-            ind_start_without_pad = None
+        _, ind_start_without_pad = (src_tokens - self.padding_idx == 0).type(src_tokens.dtype).min(dim=-1)
+        lang_ids = src_tokens.gather(1, ind_start_without_pad.view(-1,1)).view(-1)
 
         encoder_padding_mask = src_tokens.eq(self.padding_idx)
         has_pads = src_tokens.device.type == "xla" or encoder_padding_mask.any()
@@ -547,7 +540,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         for layer in self.layers:
             lr = layer(
                 x, encoder_padding_mask=encoder_padding_mask if has_pads else None,
-                ind_start_without_pad = ind_start_without_pad
+                lang_ids = lang_ids,
             )
 
             if isinstance(lr, tuple) and len(lr) == 2:
@@ -589,7 +582,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "fc_results": fc_results,  # List[T x B x C]
             "src_tokens": [],
             "src_lengths": [src_lengths],
-            "ind_start_without_pad": [ind_start_without_pad],
+            "lang_ids": [lang_ids],
         }
 
     def IN(self, x, iter_num=2):
@@ -638,13 +631,13 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         else:
             src_lengths = [(encoder_out["src_lengths"][0]).index_select(0, new_order)]
         
-        if len(encoder_out["ind_start_without_pad"]) == 0:
-            ind_start_without_pad = []
+        if len(encoder_out["lang_ids"]) == 0:
+            lang_ids = []
         else:
-            if encoder_out["ind_start_without_pad"][0] is not None:
-                ind_start_without_pad = [(encoder_out["ind_start_without_pad"][0]).index_select(0, new_order)]
+            if encoder_out["lang_ids"][0] is not None:
+                lang_ids = [(encoder_out["lang_ids"][0]).index_select(0, new_order)]
             else:
-                ind_start_without_pad = [None]
+                lang_ids = [None]
 
         encoder_states = encoder_out["encoder_states"]
         if len(encoder_states) > 0:
@@ -658,7 +651,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "encoder_states": encoder_states,  # List[T x B x C]
             "src_tokens": src_tokens,  # B x T
             "src_lengths": src_lengths,  # B x 1
-            "ind_start_without_pad": ind_start_without_pad # B
+            "lang_ids": lang_ids # B
         }
 
     def max_positions(self):

@@ -928,7 +928,7 @@ class MultiheadAttentionIN(nn.Module):
         before_softmax: bool = False,
         need_head_weights: bool = False,
         switcher=None,
-        ind_start_without_pad=None,
+        lang_ids=None,
         itype=None,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Input shape: Time x Batch x Channel
@@ -1005,7 +1005,7 @@ class MultiheadAttentionIN(nn.Module):
                 k_proj_weight=self.k_proj,
                 v_proj_weight=self.v_proj,
                 switcher=switcher,
-                ind_start_without_pad=ind_start_without_pad,
+                lang_ids=lang_ids,
             )
 
         if incremental_state is not None:
@@ -1021,29 +1021,28 @@ class MultiheadAttentionIN(nn.Module):
 
         if self.self_attention:
             # print(f"{itype} get in place B")
-            assert ind_start_without_pad == None
-            q = switcher(query, self.q_proj, ind_start_without_pad) if switcher else self.q_proj(query)
-            k = switcher(query, self.k_proj, ind_start_without_pad) if switcher else self.k_proj(query)
-            v = switcher(query, self.v_proj, ind_start_without_pad) if switcher else self.v_proj(query)
+            q = switcher(query, self.q_proj, lang_ids) if switcher else self.q_proj(query)
+            k = switcher(query, self.k_proj, lang_ids) if switcher else self.k_proj(query)
+            v = switcher(query, self.v_proj, lang_ids) if switcher else self.v_proj(query)
 
         elif self.encoder_decoder_attention:
             # print(f"{itype} get in place C {key is None}")
-            q = switcher(query, self.q_proj, ind_start_without_pad=None) if switcher else self.q_proj(query)
+            q = switcher(query, self.q_proj, lang_ids) if switcher else self.q_proj(query)
             if key is None:
                 assert value is None
                 k = v = None
             else:
                 # print(f"{itype} get in place E")
-                k = switcher(key, self.k_proj, ind_start_without_pad) if switcher else self.k_proj(key)
-                v = switcher(key, self.v_proj, ind_start_without_pad) if switcher else self.v_proj(key)
+                k = switcher(key, self.k_proj, lang_ids) if switcher else self.k_proj(key)
+                v = switcher(key, self.v_proj, lang_ids) if switcher else self.v_proj(key)
 
         else:
             # print(f"{itype} get in place D")
             raise ValueError("Code base does not support this case!")
             assert key is not None and value is not None
-            q = switcher(query, self.q_proj, ind_start_without_pad) if switcher else self.q_proj(query)
-            k = switcher(key, self.k_proj, ind_start_without_pad) if switcher else self.k_proj(key)
-            v = switcher(value, self.v_proj, ind_start_without_pad) if switcher else self.v_proj(value)
+            q = switcher(query, self.q_proj, lang_ids) if switcher else self.q_proj(query)
+            k = switcher(key, self.k_proj, lang_ids) if switcher else self.k_proj(key)
+            v = switcher(value, self.v_proj, lang_ids) if switcher else self.v_proj(value)
         q *= self.scaling
 
         if self.bias_k is not None:

@@ -586,7 +586,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         args (argparse.Namespace): parsed command-line arguments
     """
 
-    def __init__(self, cfg, return_fc=False):
+    def __init__(self, cfg, dictionary, return_fc=False):
         super().__init__()
         self.cfg = cfg
         self.expert_num = cfg.expert_num
@@ -623,10 +623,11 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             self.quant_noise,
             self.quant_noise_block_size,
         )
-        
-        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher_proj else None
-        self.switcher_fc1 = Switcher(self.embed_dim, cfg.decoder.ffn_embed_dim) if self.switcher_fc else None
-        self.switcher_fc2 = Switcher(cfg.decoder.ffn_embed_dim, self.embed_dim) if self.switcher_fc else None
+        if self.switcher_proj or self.switcher_fc:
+            dict_info = [len(dictionary) - 1, len(cfg.langs)]
+        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim, dict_info) if self.switcher_proj else None
+        self.switcher_fc1 = Switcher(self.embed_dim, cfg.decoder.ffn_embed_dim, dict_info) if self.switcher_fc else None
+        self.switcher_fc2 = Switcher(cfg.decoder.ffn_embed_dim, self.embed_dim, dict_info) if self.switcher_fc else None
 
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
@@ -763,7 +764,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         x,
         encoder_padding_mask: Optional[Tensor],
         attn_mask: Optional[Tensor] = None,
-        ind_start_without_pad = None,
+        lang_ids = None,
     ):
         """
         Args:
@@ -801,7 +802,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             need_weights=False,
             attn_mask=attn_mask,
             switcher=self.switcher_proj,
-            ind_start_without_pad=ind_start_without_pad,
+            lang_ids=lang_ids,
             itype="encoder_att",
         )
         x = self.dropout_module(x)
@@ -813,10 +814,10 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
 
-        x = self.switcher_fc1(x, self.fc1, ind_start_without_pad=ind_start_without_pad) if self.switcher_fc else self.fc1(x)
+        x = self.switcher_fc1(x, self.fc1, lang_ids=lang_ids) if self.switcher_fc else self.fc1(x)
         x = self.activation_fn(x)
         x = self.activation_dropout_module(x)
-        x = self.switcher_fc2(x, self.fc2, ind_start_without_pad=ind_start_without_pad)if self.switcher_fc else self.fc2(x)
+        x = self.switcher_fc2(x, self.fc2, lang_ids=lang_ids)if self.switcher_fc else self.fc2(x)
 
         fc_result = x
 
@@ -1042,7 +1043,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self_attn_padding_mask: Optional[torch.Tensor] = None,
         need_attn: bool = False,
         need_head_weights: bool = False,
-        ind_start_without_pad = None,
+        lang_ids = None,
     ):
         """
         Args:
@@ -1146,7 +1147,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
                 need_weights=need_attn or (not self.training and self.need_attn),
                 need_head_weights=need_head_weights,
                 switcher=self.switcher_proj,
-                ind_start_without_pad=ind_start_without_pad,
+                lang_ids=lang_ids,
                 itype="decoder_cross_att",
             )
             x = self.dropout_module(x)
