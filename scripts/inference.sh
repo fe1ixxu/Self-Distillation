@@ -11,7 +11,7 @@ for SRC in ar  de  es  fa  he  it  nl  pl  pt  ro  ru  sl  tr  zh; do
 
     cat $FSRC | python scripts/truncate.py | \
     CUDA_VISIBLE_DEVICES=0 fairseq-interactive ${DATA_DIR}/data-bin \
-        --task translation_multi_simple_epoch --encoder-langtok tgt --path $MODEL_PATH/checkpoint_best.pt \
+        --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
         --langs ar,es,en,he,nl,pt,ru,tr,de,fa,it,pl,ro,sl,zh \
         --lang-pairs ar-en,es-en,he-en,nl-en,pt-en,ru-en,tr-en,de-en,fa-en,it-en,pl-en,ro-en,sl-en,zh-en \
         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
