@@ -80,9 +80,9 @@ OMP_NUM_THREADS=25 CUDA_VISIBLE_DEVICES=1,2,3,4,5,6 fairseq-train ../data/iwslt1
 --lang-pairs ar-en,es-en,he-en,nl-en,pt-en,ru-en,tr-en,de-en,fa-en,it-en,pl-en,ro-en,sl-en,zh-en \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
 --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 25000 --dropout 0.1 --attention-dropout 0.1 \
---weight-decay 0.0 --max-tokens 2048 --update-freq 42 --patience 5 \
+--weight-decay 0.0 --max-tokens 2048 --update-freq 8 --patience 5 \
 --save-interval-updates 1000 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
---ddp-backend fully_sharded  --cpu-offload --checkpoint-activations --fp16  \
+--ddp-backend fully_sharded  --cpu-offload --checkpoint-activations --fp16  --fp16-init-scale 8 \
 --save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
 --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
 --iterative-normalization 0 --expert_num 1 --expert_type proj --switcher-proj 1 --switcher-fc 1
