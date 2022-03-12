@@ -3,7 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fairseq.modules import LayerNorm
 class Switcher(nn.Module):
-    def __init__(self, input_dim, output_dim, dict_len, layer_norm=False, hidden_dim=256, num_ls=2):
+    def __init__(self, 
+        input_dim, 
+        output_dim, 
+        dict_len, 
+        layer_norm=False, 
+        hidden_dim=256, 
+        num_ls=2
+    ):
         super().__init__()
         self.num_ls = num_ls
         self.dict_len = dict_len
