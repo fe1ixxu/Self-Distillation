@@ -8,7 +8,7 @@ class Switcher(nn.Module):
         output_dim, 
         dict_len, 
         layer_norm=False, 
-        hidden_dim=256, 
+        hidden_dim=1024, 
         num_ls=2
     ):
         super().__init__()
@@ -17,8 +17,8 @@ class Switcher(nn.Module):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.layer_norm = layer_norm
-        self.w1 = [nn.Linear(input_dim, hidden_dim) for _ in range(num_ls)]
-        self.w2 = [nn.Linear(hidden_dim, output_dim) for _ in range(num_ls)]
+        self.w1 = nn.ModuleList([nn.Linear(input_dim, hidden_dim) for _ in range(num_ls)])
+        self.w2 = nn.ModuleList([nn.Linear(hidden_dim, output_dim) for _ in range(num_ls)])
         if layer_norm:
             self.layer_norm_layer = LayerNorm(input_dim)
 
@@ -32,13 +32,15 @@ class Switcher(nn.Module):
             x = self.layer_norm_layer(x)
 
         lang_ids = self.dict_len - 1 - lang_ids
-        group = ( lang_ids <= 2 ).type(torch.long) 
+        group = ( lang_ids <= 3 ).type(torch.long) 
 
         for ind in range(self.num_ls):
             selected_id = (group==ind).nonzero().view(-1)
-            group_x = x[:, selected_id, :]
-            group_x = F.gelu(self.w1[ind](group_x))
-            group_x = self.w2[ind](group_x)
-            x[:, selected_id, :] = group_x
+            if len(selected_id) > 0:
+                ## in case no selected id in this iteration
+                group_x = x[:, selected_id, :]
+                group_x = F.gelu(self.w1[ind](group_x))
+                group_x = self.w2[ind](group_x)
+                x[:, selected_id, :] = group_x
         return x
 

@@ -73,16 +73,16 @@ conda activate mmt
 # --iterative-normalization 0 --expert_num 1 --expert_type proj --switcher 1
 
 
-SAVE_DIR=../checkpoints/iwslt_new/iwslt_LS_test/many-to-one/
-CUDA_VISIBLE_DEVICES=1,2,3,4 fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
+SAVE_DIR=../checkpoints/iwslt_new/iwslt_LS_1024/many-to-one/
+fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
 --sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
---langs de,es,it,nl,pl,ar,fa,he \
---lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-En \
+--langs de,es,it,nl,pl,ar,fa,he,en \
+--lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
---lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 25000 --dropout 0.1 --attention-dropout 0.1 \
---weight-decay 0.0 --max-tokens 850 --update-freq 32 --patience 5 \
---save-interval-updates 1000 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
---ddp-backend no_c10d --fp16 \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
+--weight-decay 0.0 --max-tokens 4096 --update-freq 8 --patience 5 \
+--save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
+--ddp-backend no_c10d --fp16  --fp16-init-scale 16 \
 --save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
 --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
 --iterative-normalization 0 --expert_num 1 --expert_type proj --switcher-proj 1 --switcher-fc 1

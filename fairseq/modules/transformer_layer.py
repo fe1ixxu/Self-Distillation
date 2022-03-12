@@ -624,7 +624,8 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             self.quant_noise_block_size,
         )
 
-        self.switcher = [Switcher(self.embed_dim, self.embed_dim, len(dictionary)) for _ in range(self.switcher_proj)] if self.switcher_proj else None
+        self.switcher_att = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_proj else None
+        self.switcher_ffn = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_fc else None
 
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
@@ -759,7 +760,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.self_attn_layer_norm(x)
 
-        lang_specific_x = self.switcher(x, lang_ids)  # Language-specific module
+        lang_specific_x = self.switcher_att(x, lang_ids) if self.switcher_att else 0  # Language-specific module
 
         x, _ = self.self_attn(
             query=x,
@@ -768,12 +769,9 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             key_padding_mask=encoder_padding_mask,
             need_weights=False,
             attn_mask=attn_mask,
-            switcher=self.switcher_proj,
-            lang_ids=lang_ids,
-            itype="encoder_att",
         )
 
-        x = x + lang_specific_x
+        x = x + lang_specific_x 
 
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
@@ -784,7 +782,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
         
-        lang_specific_x = self.switcher(x, lang_ids) # Language-specific module
+        lang_specific_x = self.switcher_ffn(x, lang_ids) if self.switcher_ffn else 0 # Language-specific module
 
         x = self.fc1(x)
         x = self.activation_fn(x)
@@ -821,7 +819,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
     """
 
     def __init__(
-        self, cfg, no_encoder_attn=False, add_bias_kv=False, add_zero_attn=False
+        self, cfg, dictionary, no_encoder_attn=False, add_bias_kv=False, add_zero_attn=False
     ):
         super().__init__()
         self.embed_dim = cfg.decoder.embed_dim
@@ -904,9 +902,9 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             self.quant_noise,
             self.quant_noise_block_size,
         )
-        self.switcher_proj = Switcher(self.embed_dim, self.embed_dim) if self.switcher_proj else None
-        self.switcher_fc1 = Switcher(self.embed_dim, cfg.decoder.ffn_embed_dim) if self.switcher_fc else None
-        self.switcher_fc2 = Switcher(cfg.decoder.ffn_embed_dim, self.embed_dim) if self.switcher_fc else None
+        self.switcher_att_1 = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_proj else None
+        self.switcher_att_2 = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_proj else None
+        self.switcher_ffn = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_fc else None
         
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
         self.need_attn = True
@@ -914,88 +912,40 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self.onnx_trace = False
 
     def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
-        if self.expert_type in ["ffn","both"]:
-            return quant_noise(
-                MoE(
-                dim=input_dim,
-                num_experts=self.expert_num,
-                output_dim=output_dim,
-                experts=Expert_FFN(input_dim, output_dim, self.expert_num),
-            ),
-            p=q_noise, block_size=qn_block_size
-            )
-        else:
-            return quant_noise(
-                nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            )
+        return quant_noise(
+            nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
+        )
 
     def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
-        if self.expert_type in ["ffn","both"]:
-            return quant_noise(
-                MoE(
-                dim=input_dim,
-                num_experts=self.expert_num,
-                output_dim=output_dim,
-                experts=Expert_FFN(input_dim, output_dim, self.expert_num),
-            ),
-            p=q_noise, block_size=qn_block_size
-            )
-        else:
-            return quant_noise(
-                nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            )
+        return quant_noise(
+            nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
+        )
 
     def build_self_attention(
         self, embed_dim, cfg, add_bias_kv=False, add_zero_attn=False
     ):
-        if self.expert_type in ["proj", "both"]:
-            return MultiheadAttentionIN(
-                embed_dim,
-                cfg.decoder.attention_heads,
-                dropout=cfg.attention_dropout,
-                add_bias_kv=add_bias_kv,
-                add_zero_attn=add_zero_attn,
-                self_attention=not cfg.cross_self_attention,
-                q_noise=self.quant_noise,
-                qn_block_size=self.quant_noise_block_size,
-                expert_num=self.expert_num,
-            )
-        else:
-            return MultiheadAttention(
-                embed_dim,
-                cfg.decoder.attention_heads,
-                dropout=cfg.attention_dropout,
-                add_bias_kv=add_bias_kv,
-                add_zero_attn=add_zero_attn,
-                self_attention=not cfg.cross_self_attention,
-                q_noise=self.quant_noise,
-                qn_block_size=self.quant_noise_block_size,
-            )
+        return MultiheadAttention(
+            embed_dim,
+            cfg.decoder.attention_heads,
+            dropout=cfg.attention_dropout,
+            add_bias_kv=add_bias_kv,
+            add_zero_attn=add_zero_attn,
+            self_attention=not cfg.cross_self_attention,
+            q_noise=self.quant_noise,
+            qn_block_size=self.quant_noise_block_size,
+        )
 
     def build_encoder_attention(self, embed_dim, cfg):
-        if self.expert_type in ["proj", "both"]:
-            return MultiheadAttentionIN(
-                embed_dim,
-                cfg.decoder.attention_heads,
-                kdim=cfg.encoder.embed_dim,
-                vdim=cfg.encoder.embed_dim,
-                dropout=cfg.attention_dropout,
-                encoder_decoder_attention=True,
-                q_noise=self.quant_noise,
-                qn_block_size=self.quant_noise_block_size,
-                expert_num=self.expert_num,
-            )
-        else:
-            return MultiheadAttention(
-                embed_dim,
-                cfg.decoder.attention_heads,
-                kdim=cfg.encoder.embed_dim,
-                vdim=cfg.encoder.embed_dim,
-                dropout=cfg.attention_dropout,
-                encoder_decoder_attention=True,
-                q_noise=self.quant_noise,
-                qn_block_size=self.quant_noise_block_size,
-            )
+        return MultiheadAttention(
+            embed_dim,
+            cfg.decoder.attention_heads,
+            kdim=cfg.encoder.embed_dim,
+            vdim=cfg.encoder.embed_dim,
+            dropout=cfg.attention_dropout,
+            encoder_decoder_attention=True,
+            q_noise=self.quant_noise,
+            qn_block_size=self.quant_noise_block_size,
+        )
 
 
     def prepare_for_onnx_export_(self):
@@ -1071,6 +1021,8 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             y = torch.cat((encoder_out, x), dim=0)
         else:
             y = x
+        
+        lang_specific_x = self.switcher_att_1(x, lang_ids) if self.switcher_att_1 else 0  # Language-specific module
 
         x, attn = self.self_attn(
             query=x,
@@ -1080,9 +1032,10 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             incremental_state=incremental_state,
             need_weights=False,
             attn_mask=self_attn_mask,
-            switcher=self.switcher_proj,
-            itype="decoder_self_att",
         )
+
+        x = x + lang_specific_x 
+
         if self.c_attn is not None:
             tgt_len, bsz = x.size(0), x.size(1)
             x = x.view(tgt_len, bsz, self.nh, self.head_dim)
@@ -1110,6 +1063,8 @@ class TransformerDecoderLayerBaseIN(nn.Module):
                 assert incremental_state is not None
                 self.encoder_attn._set_input_buffer(incremental_state, saved_state)
 
+            lang_specific_x = self.switcher_att_2(x, lang_ids) if self.switcher_att_2 else 0  # Language-specific module
+
             x, attn = self.encoder_attn(
                 query=x,
                 key=encoder_out,
@@ -1119,10 +1074,10 @@ class TransformerDecoderLayerBaseIN(nn.Module):
                 static_kv=True,
                 need_weights=need_attn or (not self.training and self.need_attn),
                 need_head_weights=need_head_weights,
-                switcher=self.switcher_proj,
-                lang_ids=lang_ids,
-                itype="decoder_cross_att",
             )
+
+            x = x + lang_specific_x
+
             x = self.dropout_module(x)
             x = self.residual_connection(x, residual)
             if not self.normalize_before:
@@ -1132,11 +1087,16 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
 
+        lang_specific_x = self.switcher_ffn(x, lang_ids) if self.switcher_ffn else 0 # Language-specific module
+
         x = self.activation_fn(self.fc1(x))
         x = self.activation_dropout_module(x)
         if self.ffn_layernorm is not None:
             x = self.ffn_layernorm(x)
         x = self.fc2(x)
+        
+        x = x + lang_specific_x
+
         x = self.dropout_module(x)
         if self.w_resid is not None:
             residual = torch.mul(self.w_resid, residual)

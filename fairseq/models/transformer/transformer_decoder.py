@@ -563,7 +563,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
             self.layers = nn.ModuleList([])
         self.layers.extend(
             [
-                self.build_decoder_layer(cfg, no_encoder_attn)
+                self.build_decoder_layer(cfg, dictionary, no_encoder_attn)
                 for _ in range(cfg.decoder.layers)
             ]
         )
@@ -617,8 +617,8 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
                 BaseLayer(cfg),
             )
 
-    def build_decoder_layer(self, cfg, no_encoder_attn=False):
-        layer = transformer_layer.TransformerDecoderLayerBaseIN(cfg, no_encoder_attn)
+    def build_decoder_layer(self, cfg, dictionary, no_encoder_attn=False):
+        layer = transformer_layer.TransformerDecoderLayerBaseIN(cfg, dictionary, no_encoder_attn)
         checkpoint = cfg.checkpoint_activations
         if checkpoint:
             offload_to_cpu = cfg.offload_activations
@@ -779,7 +779,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         # decoder layers
         attn: Optional[Tensor] = None
         inner_states: List[Optional[Tensor]] = [x]
-        ind_start_without_pad = encoder_out["ind_start_without_pad"][0]
+        lang_ids = encoder_out["lang_ids"][0]
         for idx, layer in enumerate(self.layers):
             if incremental_state is None and not full_context_alignment:
                 self_attn_mask = self.buffered_future_mask(x)
@@ -795,7 +795,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
                 self_attn_padding_mask=self_attn_padding_mask,
                 need_attn=bool((idx == alignment_layer)),
                 need_head_weights=bool((idx == alignment_layer)),
-                ind_start_without_pad=ind_start_without_pad,
+                lang_ids=lang_ids,
             )
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:
