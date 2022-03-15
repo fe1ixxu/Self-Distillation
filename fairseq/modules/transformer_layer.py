@@ -15,7 +15,6 @@ from torch import Tensor
 from fairseq.models.transformer import (
     TransformerConfig,
 )
-from fairseq.modules.mixture_of_experts import MoE
 from fairseq.modules.switcher import Switcher
 
 class TransformerEncoderLayerBase(nn.Module):
@@ -560,17 +559,6 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             TransformerConfig.from_namespace(args),
         )
 
-class Expert_FFN(nn.Module):
-    def __init__(self, input_dim, output_dim, num_experts):
-        super().__init__()
-        self.W = nn.Parameter(torch.randn(num_experts, input_dim, output_dim))
-        self.bias = nn.Parameter(torch.randn(num_experts, output_dim))
-    def forward(self, x):
-        x = torch.einsum('end,edh->enh', x, self.W)
-        x += self.bias.unsqueeze(-2)
-        return x
-
-
 class TransformerEncoderLayerBaseIN(nn.Module):
     """Encoder layer block.
 
@@ -589,10 +577,8 @@ class TransformerEncoderLayerBaseIN(nn.Module):
     def __init__(self, cfg, dictionary, return_fc=False):
         super().__init__()
         self.cfg = cfg
-        self.expert_num = cfg.expert_num
-        self.expert_type = cfg.expert_type
-        self.switcher_proj = cfg.switcher_proj
-        self.switcher_fc = cfg.switcher_fc
+        self.switcher_proj = cfg.switcher_proj and cfg.switcher_encoder
+        self.switcher_fc = cfg.switcher_fc and cfg.switcher_encoder
         self.return_fc = return_fc
         self.embed_dim = cfg.encoder.embed_dim
         self.quant_noise = cfg.quant_noise.pq
@@ -624,8 +610,8 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             self.quant_noise_block_size,
         )
 
-        self.switcher_att = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_proj else None
-        self.switcher_ffn = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_fc else None
+        self.switcher_att = Switcher(self.embed_dim, self.embed_dim, len(dictionary), hidden_dim=cfg.switcher_hidden_size) if self.switcher_proj else None
+        self.switcher_ffn = Switcher(self.embed_dim, self.embed_dim, len(dictionary), hidden_dim=cfg.switcher_hidden_size) if self.switcher_fc else None
 
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
@@ -823,10 +809,8 @@ class TransformerDecoderLayerBaseIN(nn.Module):
     ):
         super().__init__()
         self.embed_dim = cfg.decoder.embed_dim
-        self.expert_num = cfg.expert_num
-        self.expert_type = cfg.expert_type
-        self.switcher_proj = cfg.switcher_proj
-        self.switcher_fc = cfg.switcher_fc
+        self.switcher_proj = cfg.switcher_proj and cfg.switcher_decoder
+        self.switcher_fc = cfg.switcher_fc and cfg.switcher_decoder
         self.dropout_module = FairseqDropout(
             cfg.dropout, module_name=self.__class__.__name__
         )
@@ -902,9 +886,9 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             self.quant_noise,
             self.quant_noise_block_size,
         )
-        self.switcher_att_1 = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_proj else None
-        self.switcher_att_2 = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_proj else None
-        self.switcher_ffn = Switcher(self.embed_dim, self.embed_dim, len(dictionary)) if self.switcher_fc else None
+        self.switcher_att_1 = Switcher(self.embed_dim, self.embed_dim, len(dictionary), hidden_dim=cfg.switcher_hidden_size) if self.switcher_proj else None
+        self.switcher_att_2 = Switcher(self.embed_dim, self.embed_dim, len(dictionary), hidden_dim=cfg.switcher_hidden_size) if self.switcher_proj else None
+        self.switcher_ffn = Switcher(self.embed_dim, self.embed_dim, len(dictionary), hidden_dim=cfg.switcher_hidden_size) if self.switcher_fc else None
         
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
         self.need_attn = True

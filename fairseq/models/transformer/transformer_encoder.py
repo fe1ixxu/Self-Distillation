@@ -413,7 +413,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         else:
             self.layer_norm = None
         
-        self.iterative_normalization = cfg.iterative_normalization
         self.switcher = cfg.switcher_proj or cfg.switcher_fc
 
     def build_encoder_layer(self, cfg, dictionary):
@@ -548,9 +547,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             else:
                 x = lr
                 fc_result = None
-            
-            # if self.iterative_normalization > 0:
-            #     x = self.IN(x, iter_num=self.iterative_normalization)
 
             if return_all_hiddens and not torch.jit.is_scripting():
                 assert encoder_states is not None
@@ -560,9 +556,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)
-        
-        if self.iterative_normalization > 0:
-            x = self.IN(x, iter_num=self.iterative_normalization)
 
         # The Pytorch Mobile lite interpreter does not supports returning NamedTuple in
         # `forward` so we use a dictionary instead.
@@ -584,13 +577,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "src_lengths": [src_lengths],
             "lang_ids": [lang_ids],
         }
-
-    def IN(self, x, iter_num=2):
-        local_mean = torch.mean(torch.mean(x, dim=0), dim=0)
-        for _ in range(iter_num):
-            x = x - local_mean
-            x = x / torch.norm(x, dim=-1).unsqueeze(-1)
-        return x
 
     @torch.jit.export
     def reorder_encoder_out(self, encoder_out: Dict[str, List[Tensor]], new_order):

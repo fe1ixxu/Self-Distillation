@@ -8,7 +8,7 @@ class Switcher(nn.Module):
         output_dim, 
         dict_len, 
         layer_norm=False, 
-        hidden_dim=1024, 
+        hidden_dim=256, 
         num_ls=2
     ):
         super().__init__()

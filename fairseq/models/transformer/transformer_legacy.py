@@ -221,16 +221,16 @@ class TransformerModelIN(TransformerModelBaseIN):
             parser, TransformerConfig(), delete_default=True, with_prefix=""
         )
         
-        parser.add_argument('--iterative-normalization', type=int, metavar='N', default=0, \
-                            help='Pass this field to enable iterative normalization with the declared number')
-        parser.add_argument('--expert_num', type=int, metavar='N', default=1, \
-                            help='Number of Experts for kqv projection')
-        parser.add_argument('--expert_type', type=str, metavar='N', default="none", choices=["proj", "ffn", "both", "none"], \
-                            help='The type of Experts')
         parser.add_argument('--switcher-proj', type=int, metavar='N', default=0, \
                             help='Whether we use switchers')
         parser.add_argument('--switcher-fc', type=int, metavar='N', default=0, \
                             help='Whether we use switchers')
+        parser.add_argument('--switcher-encoder', type=int, metavar='N', default=0, \
+                            help='Whether we use switchers on the encoder')
+        parser.add_argument('--switcher-decoder', type=int, metavar='N', default=0, \
+                            help='Whether we use switchers on the decoder')
+        parser.add_argument('--switcher-hidden-size', type=int, metavar='N', default=256, \
+                            help='The hidden size of switchers')
 
     @classmethod
     def build_model(cls, args, task):

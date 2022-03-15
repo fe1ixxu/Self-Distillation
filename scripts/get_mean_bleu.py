@@ -4,7 +4,8 @@ import os
 
 
 def iwslt(args):
-    langs = ["ar", "fa", "de", "es", "it", "nl", "pl", "pt", "ro", "sl", "tr", "ru", "he", "zh"]
+    # langs = ["ar", "fa", "de", "es", "it", "nl", "pl", "pt", "ro", "sl", "tr", "ru", "he", "zh"]
+    langs = "de,es,it,nl,pl,ar,fa,he".split(",")
     bleus = []
     
     for lg in langs:
@@ -12,6 +13,29 @@ def iwslt(args):
             bleu_file = f"test.en-{lg}.{lg}.bleu"
         else:
             bleu_file = f"test.{lg}-en.en.bleu"
+        bleu_file = os.path.join(args.path, bleu_file)
+        if os.path.exists(bleu_file):
+            print(f"{lg}")
+            with open(bleu_file) as f:
+                bleu = float(f.readlines()[0].strip())
+            
+            bleus.append(bleu)
+            print(f"Bleu for {lg} is {round(bleu, 2)}")
+        else:
+            print(f"No Bleu for {lg}")
+
+
+    print(f"Mean value of BLEU is {sum(bleus)/len(bleus)}")
+    print("\t".join([str(b) for b in bleus]))
+
+def opus_test(args):
+    langs = ["de", "es", "it", "nl", "pl", "ar", "fa", "he"]
+    bleus = []
+    for lg in langs:
+        if args.nen:
+            bleu_file = f"test.en-{lg}.{lg}.bleu" 
+        else:
+            bleu_file = f"test.en-{lg}.en.bleu"
         bleu_file = os.path.join(args.path, bleu_file)
         if os.path.exists(bleu_file):
             print(f"{lg}")
@@ -105,12 +129,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--path', type=str, required=True)
     parser.add_argument('--nen', action="store_true")
-    parser.add_argument('--data', type=str, choices=["iwslt", "opus"])
+    parser.add_argument('--data', type=str, choices=["iwslt", "opus", "opus_test"])
     args = parser.parse_args()
 
     if args.data == "iwslt":
         iwslt(args)
     elif args.data == "opus":
         opus(args)
+    elif args.data == "opus_test":
+        opus_test(args)
     else:
         raise ValueError("Not such dataset")
