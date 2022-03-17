@@ -34,14 +34,14 @@ class Switcher(nn.Module):
         lang_ids = self.dict_len - 1 - lang_ids
 
         ## for wmt
-        # group = [( lang_ids <= 4 ).type(torch.long),
-        #         ( torch.logical_and(lang_ids>4, lang_ids<7) ).type(torch.long),
-        #         ( lang_ids >= 7 ).type(torch.long)]
+        group = [( lang_ids <= 4 ).type(torch.long),
+                ( torch.logical_and(lang_ids>4, lang_ids<7) ).type(torch.long),
+                ( lang_ids >= 7 ).type(torch.long)]
 
         ## for opus subset
-        group = [( lang_ids <= 3 ).type(torch.long),
-                ( torch.logical_and(lang_ids>3, lang_ids<6) ).type(torch.long),
-                ( lang_ids >= 6 ).type(torch.long)]
+        # group = [( lang_ids <= 3 ).type(torch.long),
+        #         ( torch.logical_and(lang_ids>3, lang_ids<6) ).type(torch.long),
+        #         ( lang_ids >= 6 ).type(torch.long)]
 
         for ind in range(self.num_ls):
             selected_id = (group[ind]==1).nonzero().view(-1)

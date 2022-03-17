@@ -136,6 +136,26 @@ MODEL_PATH=$1
 #     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
 
 # done
+# DATA_DIR=../data/opus-100/rebuilt-subset/
+# for SRC in fr gl it fi et ar fa he ; do
+#     TGT=en
+#     FSRC=${DATA_DIR}/test.${TGT}-${SRC}.${SRC}
+#     FTGT=${DATA_DIR}/raw/test.${TGT}-${SRC}.${TGT}
+#     FOUT=${MODEL_PATH}/results/test.${TGT}-${SRC}.${TGT}
+#     mkdir -p ${MODEL_PATH}/results
+
+#     cat $FSRC | python scripts/truncate.py | \
+#     CUDA_VISIBLE_DEVICES=2 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+#         --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
+#         --langs fr,gl,it,fi,et,ar,fa,he,en \
+#         --lang-pairs fr-en,gl-en,it-en,fi-en,et-en,ar-en,fa-en,he-en \
+#         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
+#         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
+#     grep -P "^H" | cut -f 3- > $FOUT
+
+#     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
+
+# done
 
 # lg=$2
 # DATA_DIR=../data/opus-100/rebuilt-small/
@@ -209,7 +229,7 @@ MODEL_PATH=$1
 
 ### WMT 21 many to one
 DATA_DIR=../data/wmt21/
-for SRC in ms; do
+for SRC in hr sr mk et hu jv id ms tl; do
     TGT=en
     FSRC=${DATA_DIR}/tok/test.${TGT}-${SRC}.${SRC}
     FTGT=${DATA_DIR}/small/test.${TGT}-${SRC}.${TGT}
@@ -217,10 +237,10 @@ for SRC in ms; do
     mkdir -p ${MODEL_PATH}/results
 
     cat $FSRC | python scripts/truncate.py | \
-    CUDA_VISIBLE_DEVICES=7 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+    CUDA_VISIBLE_DEVICES=6 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
         --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
-        --langs ms,en \
-        --lang-pairs ms-en \
+        --langs hr,sr,mk,et,hu,jv,id,ms,tl,en \
+        --lang-pairs hr-en,sr-en,mk-en,et-en,hu-en,jv-en,id-en,ms-en,tl-en \
         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
     grep -P "^H" | cut -f 3- > $FOUT
