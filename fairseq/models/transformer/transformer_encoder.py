@@ -25,7 +25,7 @@ from torch import Tensor
 from fairseq.models.transformer import (
     TransformerConfig,
 )
-
+from fairseq.modules.switcher import Mapper
 
 # rewrite name for backward compatibility in `make_generation_fast_`
 def module_name_fordropout(module_name: str) -> str:
@@ -414,6 +414,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layer_norm = None
         
         self.switcher = cfg.switcher_proj or cfg.switcher_fc
+        self.mapper = Mapper(len(dictionary), dim=embed_dim, num_ls=len(cfg.langs)-1) if cfg.mapper else None
 
     def build_encoder_layer(self, cfg, dictionary):
         layer = transformer_layer.TransformerEncoderLayerBaseIN(
@@ -556,6 +557,9 @@ class TransformerEncoderBaseIN(FairseqEncoder):
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)
+
+        if self.mapper is not None:
+            x = self.mapper(x, lang_ids)
 
         # The Pytorch Mobile lite interpreter does not supports returning NamedTuple in
         # `forward` so we use a dictionary instead.

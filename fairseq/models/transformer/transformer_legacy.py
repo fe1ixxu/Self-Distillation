@@ -231,6 +231,8 @@ class TransformerModelIN(TransformerModelBaseIN):
                             help='Whether we use switchers on the decoder')
         parser.add_argument('--switcher-hidden-size', type=int, metavar='N', default=256, \
                             help='The hidden size of switchers')
+        parser.add_argument('--mapper', type=int, metavar='N', default=0, \
+                            help='if use mapper between encoder and decoder')
 
     @classmethod
     def build_model(cls, args, task):

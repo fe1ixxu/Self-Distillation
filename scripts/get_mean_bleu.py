@@ -52,6 +52,31 @@ def opus_test(args):
     print("\t".join([str(b) for b in bleus]))
 
 
+def wmt(args):
+    langs = "hr sr mk et hu jv id ms tl".split(" ")
+    bleus = []
+    for lg in langs:
+        if args.nen:
+            bleu_file = f"test.en-{lg}.{lg}.bleu" 
+        else:
+            bleu_file = f"test.en-{lg}.en.bleu"
+        bleu_file = os.path.join(args.path, bleu_file)
+        if os.path.exists(bleu_file):
+            print(f"{lg}")
+            with open(bleu_file) as f:
+                bleu = float(f.readlines()[0].strip())
+            
+            bleus.append(bleu)
+            print(f"Bleu for {lg} is {round(bleu, 2)}")
+        else:
+            print(f"No Bleu for {lg}")
+
+
+    print(f"Mean value of BLEU is {sum(bleus)/len(bleus)}")
+    print("\t".join([str(b) for b in bleus]))
+
+
+
 
 def opus(args):
     langs = ['af', 'am', 'ar', 'as', 'az', 'be', 'bg', 'bn', 'br', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'el', 'eo', 'es', 'et',
@@ -129,7 +154,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('--path', type=str, required=True)
     parser.add_argument('--nen', action="store_true")
-    parser.add_argument('--data', type=str, choices=["iwslt", "opus", "opus_test"])
+    parser.add_argument('--data', type=str, choices=["iwslt", "opus", "opus_test", "wmt"])
     args = parser.parse_args()
 
     if args.data == "iwslt":
@@ -138,5 +163,7 @@ if __name__ == '__main__':
         opus(args)
     elif args.data == "opus_test":
         opus_test(args)
+    elif args.data == "wmt":
+        wmt(args)
     else:
         raise ValueError("Not such dataset")
