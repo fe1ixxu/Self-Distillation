@@ -73,35 +73,15 @@ conda activate mmt
 # --iterative-normalization 0 --expert_num 1 --expert_type proj --switcher 1
 
 # Many to one
-# hidden_size=${1}
-# name=${2}
-# encoder=${3}
-# decoder=${4}
-# SAVE_DIR=../checkpoints/iwslt_new2/LS_${hidden_size}_${name}/many-to-one/
-# fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
-# --sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
-# --langs de,es,it,nl,pl,ar,fa,he,en \
-# --lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
-# --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
-# --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
-# --weight-decay 0.0 --max-tokens 4096 --update-freq 4 --patience 3 \
-# --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
-# --ddp-backend no_c10d --fp16  --fp16-init-scale 16 \
-# --save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
-# --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
-# --switcher-proj 0 --switcher-fc 1 --switcher-encoder ${encoder} --switcher-decoder ${decoder} --switcher-hidden-size ${hidden_size}
-
-## One to Many
 hidden_size=0 #${1}
 # name=${2}
 encoder=0 #${3}
 decoder=0 #${4}
-
-SAVE_DIR=../checkpoints/iwslt_new2/mapper_base/one-to-many/
+SAVE_DIR=../checkpoints/iwslt_new2/mapper_base/many-to-one/
 fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
---sampling-method temperature --sampling-temperature 2 --encoder-langtok tgt \
+--sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
 --langs de,es,it,nl,pl,ar,fa,he,en \
---lang-pairs en-de,en-es,en-it,en-nl,en-pl,en-ar,en-fa,en-he \
+--lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
 --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
 --weight-decay 0.0 --max-tokens 4096 --update-freq 4 --patience 3 \
@@ -110,6 +90,26 @@ fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task
 --save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
 --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
 --switcher-proj 0 --switcher-fc 1 --switcher-encoder ${encoder} --switcher-decoder ${decoder} --switcher-hidden-size ${hidden_size} --mapper 1
+
+## One to Many
+# hidden_size=${1}
+# name=${2}
+# encoder=${3}
+# decoder=${4}
+
+# SAVE_DIR=../checkpoints/iwslt_new2/LS_${hidden_size}_${name}/one-to-many/
+# fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
+# --sampling-method temperature --sampling-temperature 2 --encoder-langtok tgt \
+# --langs de,es,it,nl,pl,ar,fa,he,en \
+# --lang-pairs en-de,en-es,en-it,en-nl,en-pl,en-ar,en-fa,en-he \
+# --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+# --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
+# --weight-decay 0.0 --max-tokens 4096 --update-freq 4 --patience 3 \
+# --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
+# --ddp-backend no_c10d --fp16  --fp16-init-scale 16 \
+# --save-dir ${SAVE_DIR} --max-source-positions 256 --max-target-positions 256 \
+# --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
+# --switcher-proj 0 --switcher-fc 1 --switcher-encoder ${encoder} --switcher-decoder ${decoder} --switcher-hidden-size ${hidden_size} 
 
 
 ## single language gpu = 2
