@@ -3,24 +3,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fairseq.modules import LayerNorm
 class Switcher(nn.Module):
-    def __init__(self, 
-        input_dim, 
-        output_dim, 
-        dict_len, 
-        layer_norm=False, 
-        hidden_dim=1024, 
-        num_ls=3,
+    def __init__(self,
+        base_model
+        dict_len,
+        num_lang,
     ):
+        """
+        base_model has to be a Linear model
+        """
         super().__init__()
-        self.num_ls = num_ls
+        self.base_model = base_model
         self.dict_len = dict_len
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.layer_norm = layer_norm
-        self.w1 = nn.ModuleList([nn.Linear(input_dim, hidden_dim) for _ in range(num_ls)])
-        self.w2 = nn.ModuleList([nn.Linear(hidden_dim, output_dim) for _ in range(num_ls)])
-        if layer_norm:
-            self.layer_norm_layer = LayerNorm(input_dim)
+        self.num_lang = num_lang
+
+        self.W = nn.ModuleList([nn.Linear(input_dim, hidden_dim) for _ in range(num_lang)])
 
     def forward(self, x, lang_ids):
         """
