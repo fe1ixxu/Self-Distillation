@@ -22,7 +22,7 @@ class Switcher(nn.Module):
         self.active = active
 
         if base_model is not None:
-            input_dim = output_dim = base_model.weight.shape[1]
+            input_dim = output_dim = base_model.weight.shape[0]
         else:
             assert dim is not None
             input_dim = output_dim = dim
@@ -45,29 +45,35 @@ class Switcher(nn.Module):
 
         assert lang_ids is not None
         lang_ids = self.dict_len - 1 - lang_ids
-        selected_id = [(lang_ids == ind).nonzero().view(-1) for ind in range(self.num_lang)]
-        max_lg_bz = max([len(s) for s in selected_id])
+        # selected_id = [(lang_ids == ind).nonzero().view(-1) for ind in range(self.num_lang)]
+        # max_lg_bz = max([len(s) for s in selected_id])
         
         # first go to the base model
         if self.base_model is not None:
             x = self.base_model(x)
 
-        y = []
+        y = torch.zeros(x.shape[0], x.shape[1], self.W.shape[-1]).type(x.dtype).to(x.device)
         for ind in range(self.num_lang):
-            group_x = x.index_select(1, selected_id[ind])
-            ## Pad the tensor to ensure the same batch dim before concat
-            zeros = torch.zeros([group_x.shape[0], max_lg_bz-group_x.shape[1], group_x.shape[2]]).type(x.dtype).to(x.device)
-            group_x = torch.cat([group_x, zeros], dim=1)
-            y.append(group_x)
+            selected_id = (lang_ids == ind).nonzero().view(-1)
+            y[:, selected_id, :] = x[:, selected_id, :] @ self.W[ind] + self.bias[ind]
+        return y
+
+        # y = []
+        # for ind in range(self.num_lang):
+        #     group_x = x.index_select(1, selected_id[ind])
+        #     ## Pad the tensor to ensure the same batch dim before concat
+        #     zeros = torch.zeros([group_x.shape[0], max_lg_bz-group_x.shape[1], group_x.shape[2]]).type(x.dtype).to(x.device)
+        #     group_x = torch.cat([group_x, zeros], dim=1)
+        #     y.append(group_x)
         
-        y = torch.stack(y)
-        y = torch.einsum('abcd,ade->abce', y, self.W)
+        # y = torch.stack(y)
+        # y = torch.einsum('abcd,ade->abce', y, self.W)
 
-        x = torch.zeros(x.shape[0], x.shape[1], y.shape[-1]).type(x.dtype).to(x.device)
-        for ind in range(self.num_lang):
-            x[:, selected_id[ind], :] = y[ind, :, :len(selected_id[ind]) ,:] + self.bias[ind] ## remove zeros
+        # x = torch.zeros(x.shape[0], x.shape[1], y.shape[-1]).type(x.dtype).to(x.device)
+        # for ind in range(self.num_lang):
+        #     x[:, selected_id[ind], :] = y[ind, :, :len(selected_id[ind]) ,:] + self.bias[ind] ## remove zeros
 
-        return x
+        # return x
 
 
 class Mapper(nn.Module):
