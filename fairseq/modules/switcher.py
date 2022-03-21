@@ -9,6 +9,7 @@ class Switcher(nn.Module):
         num_lang,
         active,
         dim=None,
+        shared_model=None
     ):
         """
         base_model has to be a Linear model
@@ -21,15 +22,8 @@ class Switcher(nn.Module):
         self.num_lang = num_lang
         self.active = active
 
-        if base_model is not None:
-            input_dim = output_dim = base_model.weight.shape[0]
-        else:
-            assert dim is not None
-            input_dim = output_dim = dim
-
         if self.active:
-            self.W = nn.Parameter(torch.rand(num_lang, input_dim, output_dim))
-            self.bias = nn.Parameter(torch.rand(num_lang, output_dim))
+            self.W = shared_model
 
     def forward(self, x, lang_ids):
         """
@@ -52,10 +46,10 @@ class Switcher(nn.Module):
         if self.base_model is not None:
             x = self.base_model(x)
 
-        y = torch.zeros(x.shape[0], x.shape[1], self.W.shape[-1]).type(x.dtype).to(x.device)
+        y = torch.zeros(x.shape[0], x.shape[1], self.W[0].weight.shape[0]).type(x.dtype).to(x.device)
         for ind in range(self.num_lang):
             selected_id = (lang_ids == ind).nonzero().view(-1)
-            y[:, selected_id, :] = x[:, selected_id, :] @ self.W[ind] + self.bias[ind]
+            y[:, selected_id, :] = self.W[ind](x[:, selected_id, :])
         return y
 
         # y = []

@@ -373,8 +373,17 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         
         cfg.len_dictionary = len(dictionary)
         cfg.num_lang = len(cfg.langs) - 1
+
+        self.W_ffn1 = nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
+        self.W_ffn2 = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.K = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.V = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.Q = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.Out_Proj = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+
         self.embed_tokens = embed_tokens
-        self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim)
+        self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim, shared_model=self.embed_mapping)
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
@@ -418,8 +427,14 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             ]
 
         self.layers.extend(
-            [self.build_encoder_layer(cfg, active_proj[i], active_ffn[i]) \
-            for i in range(cfg.encoder.layers)]
+            [
+                self.build_encoder_layer(
+                    cfg, 
+                    active_proj[i], 
+                    active_ffn[i],
+                    ) \
+            for i in range(cfg.encoder.layers)
+            ]
         )
         self.num_layers = len(self.layers)
 
@@ -428,9 +443,14 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         else:
             self.layer_norm = None
 
-    def build_encoder_layer(self, cfg, active_proj, active_ffn):
+    def build_encoder_layer(
+        self, 
+        cfg, 
+        active_proj, 
+        active_ffn,
+        ):
         layer = transformer_layer.TransformerEncoderLayerBaseIN(
-            cfg,  active_proj, active_ffn, return_fc=self.return_fc
+            cfg,  active_proj, active_ffn, self.W_ffn1, self.W_ffn2, self.K, self.V, self.Q, self.Out_Proj, return_fc=self.return_fc
         )
         checkpoint = cfg.checkpoint_activations
         if checkpoint:

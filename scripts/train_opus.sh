@@ -66,7 +66,7 @@ ulimit -n 2048
 # name=${2}
 # encoder=${3}
 # decoder=${4}
-SAVE_DIR=../checkpoints/opus/small_LS_para/many-to-one/
+SAVE_DIR=../checkpoints/opus/small_LS_para-shared/many-to-one/
 fairseq-train  ../data/opus-100/rebuilt-small/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
 --sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
 --langs en,de,es,it,nl,pl,ar,fa,he \

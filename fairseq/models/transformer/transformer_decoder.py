@@ -529,6 +529,17 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         cfg.len_dictionary = len(dictionary)
         cfg.num_lang = len(cfg.langs) - 1
 
+        self.W_ffn1 = nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
+        self.W_ffn2 = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.K_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.V_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.Q_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.K_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.V_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.Q_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.Out_Proj_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.Out_Proj_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+
         if not cfg.adaptive_input and cfg.quant_noise.pq > 0:
             self.quant_noise = apply_quant_noise_(
                 nn.Linear(embed_dim, embed_dim, bias=False),
@@ -639,7 +650,21 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
 
     def build_decoder_layer(self, cfg, active_proj_self, active_proj_encoder, active_ffn, no_encoder_attn=False):
         layer = transformer_layer.TransformerDecoderLayerBaseIN(
-            cfg, active_proj_self, active_proj_encoder, active_ffn, no_encoder_attn
+            cfg, 
+            active_proj_self, 
+            active_proj_encoder, 
+            active_ffn,
+            self.W_ffn1,
+            self.W_ffn2,
+            self.K_self,
+            self.V_self,
+            self.Q_self,
+            self.K_encoder,
+            self.V_encoder,
+            self.Q_encoder,
+            self.Out_Proj_self,
+            self.Out_Proj_encoder,         
+            no_encoder_attn
         )
         checkpoint = cfg.checkpoint_activations
         if checkpoint:
