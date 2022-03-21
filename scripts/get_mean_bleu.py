@@ -29,7 +29,8 @@ def iwslt(args):
     print("\t".join([str(b) for b in bleus]))
 
 def opus_test(args):
-    langs = "fr,gl,it,fi,et,ar,fa,he".split(",")
+    # langs = "fr,gl,it,fi,et,ar,fa,he".split(",")
+    langs = "de,es,it,nl,pl,ar,fa,he".split(",")
     bleus = []
     for lg in langs:
         if args.nen:

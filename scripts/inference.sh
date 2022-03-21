@@ -116,26 +116,26 @@ MODEL_PATH=$1
 
 # done
 
-# DATA_DIR=../data/opus-100/rebuilt-small/
-# for SRC in de es it nl pl ar fa he; do
-#     TGT=en
-#     FSRC=${DATA_DIR}/test.${TGT}-${SRC}.${SRC}
-#     FTGT=${DATA_DIR}/raw/test.${TGT}-${SRC}.${TGT}
-#     FOUT=${MODEL_PATH}/results/test.${TGT}-${SRC}.${TGT}
-#     mkdir -p ${MODEL_PATH}/results
+DATA_DIR=../data/opus-100/rebuilt-small/
+for SRC in de es it nl pl ar fa he; do
+    TGT=en
+    FSRC=${DATA_DIR}/test.${TGT}-${SRC}.${SRC}
+    FTGT=${DATA_DIR}/raw/test.${TGT}-${SRC}.${TGT}
+    FOUT=${MODEL_PATH}/results/test.${TGT}-${SRC}.${TGT}
+    mkdir -p ${MODEL_PATH}/results
 
-#     cat $FSRC | python scripts/truncate.py | \
-#     CUDA_VISIBLE_DEVICES=2 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
-#         --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
-#         --langs de,es,it,nl,pl,ar,fa,he,en \
-#         --lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
-#         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
-#         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
-#     grep -P "^H" | cut -f 3- > $FOUT
+    cat $FSRC | python scripts/truncate.py | \
+    CUDA_VISIBLE_DEVICES=2 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+        --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
+        --langs en,de,es,it,nl,pl,ar,fa,he \
+        --lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
+        --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
+        --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
+    grep -P "^H" | cut -f 3- > $FOUT
 
-#     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
+    cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
 
-# done
+done
 # DATA_DIR=../data/opus-100/rebuilt-subset/
 # for SRC in fr gl it fi et ar fa he ; do
 #     TGT=en
@@ -228,26 +228,26 @@ MODEL_PATH=$1
 
 
 ### WMT 21 many to one
-DATA_DIR=../data/wmt21/
-for SRC in hr sr mk et hu jv id ms tl; do
-    TGT=en
-    FSRC=${DATA_DIR}/tok/test.${TGT}-${SRC}.${SRC}
-    FTGT=${DATA_DIR}/small/test.${TGT}-${SRC}.${TGT}
-    FOUT=${MODEL_PATH}/results/test.${TGT}-${SRC}.${TGT}
-    mkdir -p ${MODEL_PATH}/results
+# DATA_DIR=../data/wmt21/
+# for SRC in hr sr mk et hu jv id ms tl; do
+#     TGT=en
+#     FSRC=${DATA_DIR}/tok/test.${TGT}-${SRC}.${SRC}
+#     FTGT=${DATA_DIR}/small/test.${TGT}-${SRC}.${TGT}
+#     FOUT=${MODEL_PATH}/results/test.${TGT}-${SRC}.${TGT}
+#     mkdir -p ${MODEL_PATH}/results
 
-    cat $FSRC | python scripts/truncate.py | \
-    CUDA_VISIBLE_DEVICES=6 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
-        --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
-        --langs hr,sr,mk,et,hu,jv,id,ms,tl,en \
-        --lang-pairs hr-en,sr-en,mk-en,et-en,hu-en,jv-en,id-en,ms-en,tl-en \
-        --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
-        --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
-    grep -P "^H" | cut -f 3- > $FOUT
+#     cat $FSRC | python scripts/truncate.py | \
+#     CUDA_VISIBLE_DEVICES=6 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+#         --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
+#         --langs hr,sr,mk,et,hu,jv,id,ms,tl,en \
+#         --lang-pairs hr-en,sr-en,mk-en,et-en,hu-en,jv-en,id-en,ms-en,tl-en \
+#         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
+#         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
+#     grep -P "^H" | cut -f 3- > $FOUT
 
-    cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
+#     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
 
-done
+# done
 
 ### WMT 21 one-to-many
 # DATA_DIR=../data/wmt21/
