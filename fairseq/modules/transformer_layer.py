@@ -628,7 +628,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         return Switcher(
             quant_noise(
             nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            )
+            ),
             cfg.len_dictionary,
             cfg.num_lang,
             active_ffn[1]

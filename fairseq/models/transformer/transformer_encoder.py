@@ -374,7 +374,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         cfg.len_dictionary = len(dictionary)
         cfg.num_lang = len(cfg.langs) - 1
         self.embed_tokens = embed_tokens
-        self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True)
+        self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim)
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
@@ -408,7 +408,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = nn.ModuleList([])
         ## k,v,q,out_proj
         active_proj = [
-                [True, True, True True] if i <= 3 else [False, True, False, True] \
+                [True, True, True, True] if i <= 3 else [False, True, False, True] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2

@@ -66,19 +66,18 @@ ulimit -n 2048
 # name=${2}
 # encoder=${3}
 # decoder=${4}
-# SAVE_DIR=../checkpoints/opus/small_LS_${hidden_size}_${name}/many-to-one/
-# fairseq-train  ../data/opus-100/rebuilt-small/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
-# --sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
-# --langs de,es,it,nl,pl,ar,fa,he,en \
-# --lang-pairs  de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
-# --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
-# --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 25000 --dropout 0.1 --attention-dropout 0.1 \
-# --weight-decay 0.0 --max-tokens 4096 --update-freq 4 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
-# --log-format simple --log-interval 100 --seed 1234  --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 10 \
-# --save-dir ${SAVE_DIR} --max-source-positions 256 \
-# --max-target-positions 256 --skip-invalid-size-inputs-valid-test \
-# --tensorboard-logdir ${SAVE_DIR}/log/ \
-# --switcher-proj 0 --switcher-fc 1 --switcher-encoder ${encoder} --switcher-decoder ${decoder} --switcher-hidden-size ${hidden_size}
+SAVE_DIR=../checkpoints/opus/small_LS_para/many-to-one/
+fairseq-train  ../data/opus-100/rebuilt-small/data-bin/ --arch transformer_iwslt_de_en_IN --task translation_multi_simple_epoch \
+--sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
+--langs de,es,it,nl,pl,ar,fa,he,en \
+--lang-pairs  de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en \
+--criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 30000 --dropout 0.1 --attention-dropout 0.1 \
+--weight-decay 0.0 --max-tokens 8192 --update-freq 2 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
+--log-format simple --log-interval 100 --seed 1234 --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 10 \
+--save-dir ${SAVE_DIR} --max-source-positions 256 \
+--max-target-positions 256 --skip-invalid-size-inputs-valid-test \
+--tensorboard-logdir ${SAVE_DIR}/log/  \
 
 ##### Single language 2gpus
 # lg=$1
@@ -169,16 +168,16 @@ ulimit -n 2048
 # --tensorboard-logdir ${SAVE_DIR}/log/ \
 # --switcher-proj 0 --switcher-fc 1 --switcher-encoder 0 --switcher-decoder 0 --switcher-hidden-size 0
 
-SAVE_DIR=../checkpoints/opus/subset_base_3_2/many-to-one/
-fairseq-train  ../data/opus-100/rebuilt-subset/data-bin/ --arch transformer_vaswani_wmt_en_de_big_IN --task translation_multi_simple_epoch \
---sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
---langs ar,fa,he,en \
---lang-pairs  ar-en,fa-en,he-en \
---criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
---lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1500 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
---weight-decay 0.0 --max-tokens 8192 --update-freq 8 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
---log-format simple --log-interval 100  --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 4 \
---save-dir ${SAVE_DIR} --max-source-positions 256 \
---max-target-positions 256 --skip-invalid-size-inputs-valid-test \
---tensorboard-logdir ${SAVE_DIR}/log/ \
---switcher-proj 0 --switcher-fc 1 --switcher-encoder 0 --switcher-decoder 0 --switcher-hidden-size 0
+# SAVE_DIR=../checkpoints/opus/subset_base_3_2/many-to-one/
+# fairseq-train  ../data/opus-100/rebuilt-subset/data-bin/ --arch transformer_vaswani_wmt_en_de_big_IN --task translation_multi_simple_epoch \
+# --sampling-method temperature --sampling-temperature 2 --encoder-langtok src \
+# --langs ar,fa,he,en \
+# --lang-pairs  ar-en,fa-en,he-en \
+# --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+# --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1500 --max-update 20000 --dropout 0.1 --attention-dropout 0.1 \
+# --weight-decay 0.0 --max-tokens 8192 --update-freq 8 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
+# --log-format simple --log-interval 100  --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 4 \
+# --save-dir ${SAVE_DIR} --max-source-positions 256 \
+# --max-target-positions 256 --skip-invalid-size-inputs-valid-test \
+# --tensorboard-logdir ${SAVE_DIR}/log/ \
+# --switcher-proj 0 --switcher-fc 1 --switcher-encoder 0 --switcher-decoder 0 --switcher-hidden-size 0

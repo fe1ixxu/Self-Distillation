@@ -15,8 +15,8 @@ from fairseq import utils
 from fairseq.incremental_decoding_utils import with_incremental_state
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
-from fairseq.modules.mixture_of_experts import MoE, Experts
 from fairseq.modules.attention_forward import multi_head_attention_forward
+from fairseq.modules.switcher import Switcher
 
 @with_incremental_state
 class MultiheadAttention(nn.Module):
@@ -748,16 +748,22 @@ class MultiheadAttentionIN(nn.Module):
             nn.init.xavier_uniform_(self.k_proj.base_model.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.v_proj.base_model.weight, gain=1 / math.sqrt(2))
             nn.init.xavier_uniform_(self.q_proj.base_model.weight, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.k_proj.W, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.v_proj.W, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.q_proj.W, gain=1 / math.sqrt(2))
+            if self.k_proj.active:
+                nn.init.xavier_uniform_(self.k_proj.W, gain=1 / math.sqrt(2))
+            if self.v_proj.active:
+                nn.init.xavier_uniform_(self.v_proj.W, gain=1 / math.sqrt(2))
+            if self.q_proj.active:
+                nn.init.xavier_uniform_(self.q_proj.W, gain=1 / math.sqrt(2))
         else:
             nn.init.xavier_uniform_(self.k_proj.base_model.weight)
             nn.init.xavier_uniform_(self.v_proj.base_model.weight)
             nn.init.xavier_uniform_(self.q_proj.base_model.weight)
-            nn.init.xavier_uniform_(self.k_proj.W.weight)
-            nn.init.xavier_uniform_(self.v_proj.W.weight)
-            nn.init.xavier_uniform_(self.q_proj.W.weight)
+            if self.k_proj.active:
+                nn.init.xavier_uniform_(self.k_proj.W.weight)
+            if self.v_proj.active:
+                nn.init.xavier_uniform_(self.v_proj.W.weight)
+            if self.q_proj.active:
+                nn.init.xavier_uniform_(self.q_proj.W.weight)
 
         nn.init.xavier_uniform_(self.out_proj.base_model.weight)
         nn.init.xavier_uniform_(self.out_proj.W)

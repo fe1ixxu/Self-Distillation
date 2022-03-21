@@ -8,6 +8,7 @@ class Switcher(nn.Module):
         dict_len,
         num_lang,
         active,
+        dim=None,
     ):
         """
         base_model has to be a Linear model
@@ -20,7 +21,11 @@ class Switcher(nn.Module):
         self.num_lang = num_lang
         self.active = active
 
-        input_dim = output_dim = base_model.weight.shape[1]
+        if base_model is not None:
+            input_dim = output_dim = base_model.weight.shape[1]
+        else:
+            assert dim is not None
+            input_dim = output_dim = dim
 
         if self.active:
             self.W = nn.Parameter(torch.rand(num_lang, input_dim, output_dim))
@@ -32,7 +37,7 @@ class Switcher(nn.Module):
         dim1: input dim
         dim2: output dim
         """
-        if not active:
+        if not self.active:
             if self.base_model is not None:
                 return self.base_model(x)
             else:
@@ -51,14 +56,14 @@ class Switcher(nn.Module):
         for ind in range(self.num_lang):
             group_x = x.index_select(1, selected_id[ind])
             ## Pad the tensor to ensure the same batch dim before concat
-            zeros = torch.zeros([group_x.shape[0], max_lg_bz-group_x.shape[1], group_x.shape[2]]).to(x.device)
+            zeros = torch.zeros([group_x.shape[0], max_lg_bz-group_x.shape[1], group_x.shape[2]]).type(x.dtype).to(x.device)
             group_x = torch.cat([group_x, zeros], dim=1)
             y.append(group_x)
         
         y = torch.stack(y)
         y = torch.einsum('abcd,ade->abce', y, self.W)
 
-        x = torch.zeros(x.shape[0], x.shape[1], y.shape[-1])
+        x = torch.zeros(x.shape[0], x.shape[1], y.shape[-1]).type(x.dtype).to(x.device)
         for ind in range(self.num_lang):
             x[:, selected_id[ind], :] = y[ind, :, :len(selected_id[ind]) ,:] + self.bias[ind] ## remove zeros
 
