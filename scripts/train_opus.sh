@@ -74,7 +74,7 @@ fairseq-train  ../data/opus-100/rebuilt-small/data-bin/ --arch transformer_iwslt
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
 --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 30000 --dropout 0.1 --attention-dropout 0.1 \
 --weight-decay 0.0 --max-tokens 8192 --update-freq 2 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
---seed 1234 --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 10 \
+--log-format simple --log-interval 100 --seed 1234 --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 10 \
 --save-dir ${SAVE_DIR} --max-source-positions 256 \
 --max-target-positions 256 --skip-invalid-size-inputs-valid-test \
 --tensorboard-logdir ${SAVE_DIR}/log/  \
