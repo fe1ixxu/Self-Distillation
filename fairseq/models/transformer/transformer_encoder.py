@@ -25,7 +25,7 @@ from torch import Tensor
 from fairseq.models.transformer import (
     TransformerConfig,
 )
-from fairseq.modules.switcher import Mapper
+from fairseq.modules.switcher import Switcher
 
 # rewrite name for backward compatibility in `make_generation_fast_`
 def module_name_fordropout(module_name: str) -> str:
@@ -370,8 +370,11 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         embed_dim = embed_tokens.embedding_dim
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = cfg.max_source_positions
-
+        
+        cfg.len_dictionary = len(dictionary)
+        cfg.num_lang = len(cfg.langs) - 1
         self.embed_tokens = embed_tokens
+        self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True)
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
@@ -403,8 +406,20 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = LayerDropModuleList(p=self.encoder_layerdrop)
         else:
             self.layers = nn.ModuleList([])
+        ## k,v,q,out_proj
+        active_proj = [
+                [True, True, True True] if i <= 3 else [False, True, False, True] \
+                for i in range(cfg.encoder.layers)                
+            ]
+        ## fc1, fc2
+        active_ffn = [
+                [True, True] if i >= 2 else [False, False] \
+                for i in range(cfg.encoder.layers)                
+            ]
+
         self.layers.extend(
-            [self.build_encoder_layer(cfg, dictionary) for i in range(cfg.encoder.layers)]
+            [self.build_encoder_layer(cfg, active_proj[i], active_ffn[i]) \
+            for i in range(cfg.encoder.layers)]
         )
         self.num_layers = len(self.layers)
 
@@ -412,13 +427,10 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layer_norm = LayerNorm(embed_dim, export=cfg.export)
         else:
             self.layer_norm = None
-        
-        self.switcher = cfg.switcher_proj or cfg.switcher_fc
-        self.mapper = Mapper(len(dictionary), dim=embed_dim, num_ls=len(cfg.langs)-1) if cfg.mapper else None
 
-    def build_encoder_layer(self, cfg, dictionary):
+    def build_encoder_layer(self, cfg, active_proj, active_ffn):
         layer = transformer_layer.TransformerEncoderLayerBaseIN(
-            cfg, dictionary, return_fc=self.return_fc
+            cfg,  active_proj, active_ffn, return_fc=self.return_fc
         )
         checkpoint = cfg.checkpoint_activations
         if checkpoint:
@@ -431,11 +443,14 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         return layer
 
     def forward_embedding(
-        self, src_tokens, token_embedding: Optional[torch.Tensor] = None
+        self, src_tokens, lang_ids, token_embedding: Optional[torch.Tensor] = None
     ):
         # embed tokens and positions
         if token_embedding is None:
             token_embedding = self.embed_tokens(src_tokens)
+            token_embedding = token_embedding.transpose(0, 1)
+            token_embedding = self.embed_tokens_post(token_embedding, lang_ids)
+            token_embedding = token_embedding.transpose(0, 1)
         x = embed = self.embed_scale * token_embedding
         if self.embed_positions is not None:
             x = embed + self.embed_positions(src_tokens)
@@ -521,7 +536,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         encoder_padding_mask = src_tokens.eq(self.padding_idx)
         has_pads = src_tokens.device.type == "xla" or encoder_padding_mask.any()
 
-        x, encoder_embedding = self.forward_embedding(src_tokens, token_embeddings)
+        x, encoder_embedding = self.forward_embedding(src_tokens, lang_ids, token_embeddings)
 
         # account for padding while computing the representation
         if has_pads:
@@ -558,8 +573,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         if self.layer_norm is not None:
             x = self.layer_norm(x)
 
-        if self.mapper is not None:
-            x = self.mapper(x, lang_ids)
 
         # The Pytorch Mobile lite interpreter does not supports returning NamedTuple in
         # `forward` so we use a dictionary instead.

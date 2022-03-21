@@ -469,8 +469,7 @@ def multi_head_attention_forward(
     bias_v: Optional[Tensor],
     add_zero_attn: bool,
     dropout_p: float,
-    out_proj_weight: Tensor,
-    out_proj_bias: Optional[Tensor],
+    out_proj: Tensor,
     training: bool = True,
     key_padding_mask: Optional[Tensor] = None,
     need_weights: bool = True,
@@ -482,7 +481,6 @@ def multi_head_attention_forward(
     static_k: Optional[Tensor] = None,
     static_v: Optional[Tensor] = None,
     average_attn_weights: bool = True,
-    switcher=None,
     lang_ids=None,
 ) -> Tuple[Tensor, Optional[Tensor]]:
     r"""
@@ -547,7 +545,7 @@ def multi_head_attention_forward(
           :math:`S` is the source sequence length. If ``average_weights=False``, returns attention weights per
           head of shape :math:`(num_heads, L, S)` when input is unbatched or :math:`(N, num_heads, L, S)`.
     """
-
+    assert lang_ids is not None
     is_batched = _mha_shape_check(query, key, value, key_padding_mask, attn_mask, num_heads)
 
     # For unbatched input, we unsqueeze at the expected batch-dim to pretend that the input
@@ -585,9 +583,9 @@ def multi_head_attention_forward(
     assert q_proj_weight is not None, "use_separate_proj_weight is True but q_proj_weight is None"
     assert k_proj_weight is not None, "use_separate_proj_weight is True but k_proj_weight is None"
     assert v_proj_weight is not None, "use_separate_proj_weight is True but v_proj_weight is None"
-    q = switcher(query, q_proj_weight, lang_ids) if switcher else q_proj_weight(query)
-    k = switcher(key, k_proj_weight, lang_ids) if switcher else k_proj_weight(key)
-    v = switcher(value, v_proj_weight, lang_ids) if switcher else v_proj_weight(value)
+    q = q_proj_weight(query, lang_ids)
+    k = k_proj_weight(key, lang_ids)
+    v = v_proj_weight(value, lang_ids)
 
     # prep attention mask
     if attn_mask is not None:
@@ -693,7 +691,8 @@ def multi_head_attention_forward(
     #
     attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p)
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
-    attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
+    # attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
+    attn_output = out_proj(attn_output, lang_ids)
 
     if need_weights:
         # optionally average attention weights over heads

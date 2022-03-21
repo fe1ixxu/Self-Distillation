@@ -526,6 +526,9 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
+        cfg.len_dictionary = len(dictionary)
+        cfg.num_lang = len(cfg.langs) - 1
+
         if not cfg.adaptive_input and cfg.quant_noise.pq > 0:
             self.quant_noise = apply_quant_noise_(
                 nn.Linear(embed_dim, embed_dim, bias=False),
@@ -556,6 +559,21 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
             self.layernorm_embedding = None
 
         self.cross_self_attention = cfg.cross_self_attention
+        ## k,v,q,out_proj
+        active_proj_self = [
+                [True, True, True True] if i <= 3 else [False, True, False, True] \
+                for i in range(cfg.encoder.layers)                
+            ]
+        ## k,v,q,out_proj
+        active_proj_encoder = [
+                [False, True, False, True] \
+                for i in range(cfg.encoder.layers)                
+            ]
+        ## fc1, fc2
+        active_ffn = [
+                [True, True] if i == len(cfg.encoder.layers) - 1  else [False, False] \
+                for i in range(cfg.encoder.layers)                
+            ]
 
         if self.decoder_layerdrop > 0.0:
             self.layers = LayerDropModuleList(p=self.decoder_layerdrop)
@@ -563,8 +581,10 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
             self.layers = nn.ModuleList([])
         self.layers.extend(
             [
-                self.build_decoder_layer(cfg, dictionary, no_encoder_attn)
-                for _ in range(cfg.decoder.layers)
+                self.build_decoder_layer(
+                    cfg, active_proj_self[i], active_proj_encoder[i], active_ffn[i], no_encoder_attn
+                )
+                for i in range(cfg.decoder.layers)
             ]
         )
         self.num_layers = len(self.layers)
@@ -617,8 +637,10 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
                 BaseLayer(cfg),
             )
 
-    def build_decoder_layer(self, cfg, dictionary, no_encoder_attn=False):
-        layer = transformer_layer.TransformerDecoderLayerBaseIN(cfg, dictionary, no_encoder_attn)
+    def build_decoder_layer(self, cfg, active_proj_self, active_proj_encoder, active_ffn, no_encoder_attn=False):
+        layer = transformer_layer.TransformerDecoderLayerBaseIN(
+            cfg, active_proj_self, active_proj_encoder, active_ffn, no_encoder_attn
+        )
         checkpoint = cfg.checkpoint_activations
         if checkpoint:
             offload_to_cpu = cfg.offload_activations

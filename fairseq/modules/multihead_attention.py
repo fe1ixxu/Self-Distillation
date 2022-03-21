@@ -18,17 +18,6 @@ from fairseq.modules.quant_noise import quant_noise
 from fairseq.modules.mixture_of_experts import MoE, Experts
 from fairseq.modules.attention_forward import multi_head_attention_forward
 
-class Expert_Projection(nn.Module):
-    def __init__(self, dim, num_experts, bias=True):
-        super().__init__()
-        self.W = nn.Parameter(torch.randn(num_experts, dim, dim))
-        self.bias = nn.Parameter(torch.randn(num_experts, dim)) if bias else None
-    def forward(self, x):
-        x = torch.einsum('end,edh->enh', x, self.W)
-        if self.bias is not None:
-            x += self.bias.unsqueeze(-2)
-        return x
-
 @with_incremental_state
 class MultiheadAttention(nn.Module):
     """Multi-headed attention.
@@ -650,6 +639,7 @@ class MultiheadAttention(nn.Module):
             state_dict[key] = value
 
 
+
 @with_incremental_state
 class MultiheadAttentionIN(nn.Module):
     """Multi-headed attention.
@@ -661,6 +651,9 @@ class MultiheadAttentionIN(nn.Module):
         self,
         embed_dim,
         num_heads,
+        len_dictionary,
+        num_lang,
+        active,
         kdim=None,
         vdim=None,
         dropout=0.0,
@@ -671,15 +664,12 @@ class MultiheadAttentionIN(nn.Module):
         encoder_decoder_attention=False,
         q_noise=0.0,
         qn_block_size=8,
-        expert_num=0,
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
         self.vdim = vdim if vdim is not None else embed_dim
         self.qkv_same_dim = self.kdim == embed_dim and self.vdim == embed_dim
-        self.expert_num = expert_num
-        assert self.expert_num > 0
 
         self.num_heads = num_heads
         self.dropout_module = FairseqDropout(
@@ -698,50 +688,46 @@ class MultiheadAttentionIN(nn.Module):
         assert not self.self_attention or self.qkv_same_dim, (
             "Self-attention requires query, key and " "value to be of the same size"
         )
-        
-        if self.expert_num > 1:
-            self.k_proj = MoE(
-                dim=self.kdim,
-                num_experts=self.expert_num,
-                experts=quant_noise(
-                Expert_Projection(self.kdim, self.expert_num, bias=bias), q_noise, qn_block_size
-            ))
-            self.v_proj = MoE(
-                dim=self.vdim,
-                num_experts=self.expert_num,
-                experts=quant_noise(
-                Expert_Projection(self.vdim, self.expert_num, bias=bias), q_noise, qn_block_size
-            ))
 
-            self.q_proj = MoE(
-                dim=self.embed_dim,
-                num_experts=self.expert_num,
-                experts=quant_noise(
-                Expert_Projection(self.embed_dim, self.expert_num, bias=bias), q_noise, qn_block_size
-            ))
-        else:
-            self.k_proj = quant_noise(
-                nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size
-            )
-            self.v_proj = quant_noise(
-                nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size
-            )
-            self.q_proj = quant_noise(
-                nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
-            )
+        self.k_proj = Switcher(
+            quant_noise(
+            nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size
+            ),
+            len_dictionary,
+            num_lang,
+            active=active[0]
+        )
 
-            self.out_proj = quant_noise(
-                nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
-            )
+        self.v_proj = Switcher(
+            quant_noise(
+            nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size
+            ),
+            len_dictionary,
+            num_lang,
+            active=active[1]
+        )
 
-
-        self.out_proj = quant_noise(
+        self.q_proj = Switcher(
+            quant_noise(
             nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+            ),
+            len_dictionary,
+            num_lang,
+            active=active[2]
+        )
+
+        self.out_proj = Switcher(
+            quant_noise(
+            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+            ),
+            len_dictionary,
+            num_lang,
+            active=active[3]
         )
 
         if add_bias_kv:
-            self.bias_k.append(Parameter(torch.Tensor(1, 1, embed_dim)))
-            self.bias_v.append(Parameter(torch.Tensor(1, 1, embed_dim)))
+            self.bias_k = Parameter(torch.Tensor(1, 1, embed_dim))
+            self.bias_v = Parameter(torch.Tensor(1, 1, embed_dim))
         else:
             self.bias_k = self.bias_v = None
 
@@ -756,32 +742,28 @@ class MultiheadAttentionIN(nn.Module):
         self.onnx_trace = True
 
     def reset_parameters(self):
-        if self.expert_num > 1:
-            if self.qkv_same_dim:
-                # Empirically observed the convergence to be much better with
-                # the scaled initialization
-                nn.init.xavier_uniform_(self.k_proj.experts.W, gain=1 / math.sqrt(2))
-                nn.init.xavier_uniform_(self.v_proj.experts.W, gain=1 / math.sqrt(2))
-                nn.init.xavier_uniform_(self.q_proj.experts.W, gain=1 / math.sqrt(2))
-            else:
-                nn.init.xavier_uniform_(self.k_proj.experts.W)
-                nn.init.xavier_uniform_(self.v_proj.experts.W)
-                nn.init.xavier_uniform_(self.q_proj.experts.W)
+        if self.qkv_same_dim:
+            # Empirically observed the convergence to be much better with
+            # the scaled initialization
+            nn.init.xavier_uniform_(self.k_proj.base_model.weight, gain=1 / math.sqrt(2))
+            nn.init.xavier_uniform_(self.v_proj.base_model.weight, gain=1 / math.sqrt(2))
+            nn.init.xavier_uniform_(self.q_proj.base_model.weight, gain=1 / math.sqrt(2))
+            nn.init.xavier_uniform_(self.k_proj.W, gain=1 / math.sqrt(2))
+            nn.init.xavier_uniform_(self.v_proj.W, gain=1 / math.sqrt(2))
+            nn.init.xavier_uniform_(self.q_proj.W, gain=1 / math.sqrt(2))
         else:
-            if self.qkv_same_dim:
-                # Empirically observed the convergence to be much better with
-                # the scaled initialization
-                nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
-                nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
-                nn.init.xavier_uniform_(self.q_proj.weight, gain=1 / math.sqrt(2))
-            else:
-                nn.init.xavier_uniform_(self.k_proj.weight)
-                nn.init.xavier_uniform_(self.v_proj.weight)
-                nn.init.xavier_uniform_(self.q_proj.weight)
+            nn.init.xavier_uniform_(self.k_proj.base_model.weight)
+            nn.init.xavier_uniform_(self.v_proj.base_model.weight)
+            nn.init.xavier_uniform_(self.q_proj.base_model.weight)
+            nn.init.xavier_uniform_(self.k_proj.W.weight)
+            nn.init.xavier_uniform_(self.v_proj.W.weight)
+            nn.init.xavier_uniform_(self.q_proj.W.weight)
 
-        nn.init.xavier_uniform_(self.out_proj.weight)
-        if self.out_proj.bias is not None:
-            nn.init.constant_(self.out_proj.bias, 0.0)
+        nn.init.xavier_uniform_(self.out_proj.base_model.weight)
+        nn.init.xavier_uniform_(self.out_proj.W)
+
+        if self.out_proj.base_model.bias is not None:
+            nn.init.constant_(self.out_proj.base_model.bias, 0.0)
         if self.bias_k is not None:
             nn.init.xavier_normal_(self.bias_k)
         if self.bias_v is not None:
@@ -798,32 +780,32 @@ class MultiheadAttentionIN(nn.Module):
             k_proj_heads_norm.append(
                 torch.sum(
                     torch.abs(
-                        self.k_proj.weight[
+                        self.k_proj.base_model.weight[
                             start_idx:end_idx,
                         ]
                     )
                 ).tolist()
-                + torch.sum(torch.abs(self.k_proj.bias[start_idx:end_idx])).tolist()
+                + torch.sum(torch.abs(self.k_proj.base_model.bias[start_idx:end_idx])).tolist()
             )
             q_proj_heads_norm.append(
                 torch.sum(
                     torch.abs(
-                        self.q_proj.weight[
+                        self.q_proj.base_model.weight[
                             start_idx:end_idx,
                         ]
                     )
                 ).tolist()
-                + torch.sum(torch.abs(self.q_proj.bias[start_idx:end_idx])).tolist()
+                + torch.sum(torch.abs(self.q_proj.base_model.bias[start_idx:end_idx])).tolist()
             )
             v_proj_heads_norm.append(
                 torch.sum(
                     torch.abs(
-                        self.v_proj.weight[
+                        self.v_proj.base_model.weight[
                             start_idx:end_idx,
                         ]
                     )
                 ).tolist()
-                + torch.sum(torch.abs(self.v_proj.bias[start_idx:end_idx])).tolist()
+                + torch.sum(torch.abs(self.v_proj.base_model.bias[start_idx:end_idx])).tolist()
             )
 
         heads_norm = []
@@ -840,6 +822,8 @@ class MultiheadAttentionIN(nn.Module):
             start = sorted_head_index[i] * self.head_dim
             end = (sorted_head_index[i] + 1) * self.head_dim
             reserve_head_index.append((start, end))
+
+        exit(0)
         return reserve_head_index
 
     def _adaptive_prune_heads(self, reserve_head_index: List[Tuple[int, int]]):
@@ -854,28 +838,28 @@ class MultiheadAttentionIN(nn.Module):
         for ele in reserve_head_index:
             start_idx, end_idx = ele
             new_q_weight.append(
-                self.q_proj.weight[
+                self.q_proj.base_model.weight[
                     start_idx:end_idx,
                 ]
             )
-            new_q_bias.append(self.q_proj.bias[start_idx:end_idx])
+            new_q_bias.append(self.q_proj.base_model.bias[start_idx:end_idx])
 
             new_k_weight.append(
-                self.k_proj.weight[
+                self.k_proj.base_model.weight[
                     start_idx:end_idx,
                 ]
             )
 
-            new_k_bias.append(self.k_proj.bias[start_idx:end_idx])
+            new_k_bias.append(self.k_proj.base_model.bias[start_idx:end_idx])
 
             new_v_weight.append(
-                self.v_proj.weight[
+                self.v_proj.base_model.weight[
                     start_idx:end_idx,
                 ]
             )
-            new_v_bias.append(self.v_proj.bias[start_idx:end_idx])
+            new_v_bias.append(self.v_proj.base_model.bias[start_idx:end_idx])
 
-            new_out_proj_weight.append(self.out_proj.weight[:, start_idx:end_idx])
+            new_out_proj_weight.append(self.out_proj.base_model.weight[:, start_idx:end_idx])
 
         new_q_weight = torch.cat(new_q_weight).detach()
         new_k_weight = torch.cat(new_k_weight).detach()
@@ -895,28 +879,30 @@ class MultiheadAttentionIN(nn.Module):
         new_v_bias = torch.cat(new_v_bias).detach()
         new_v_bias.requires_grad = True
 
-        self.q_proj.weight = torch.nn.Parameter(new_q_weight)
-        self.q_proj.bias = torch.nn.Parameter(new_q_bias)
+        self.q_proj.base_model.weight = torch.nn.Parameter(new_q_weight)
+        self.q_proj.base_model.bias = torch.nn.Parameter(new_q_bias)
 
-        self.k_proj.weight = torch.nn.Parameter(new_k_weight)
-        self.k_proj.bias = torch.nn.Parameter(new_k_bias)
+        self.k_proj.base_model.weight = torch.nn.Parameter(new_k_weight)
+        self.k_proj.base_model.bias = torch.nn.Parameter(new_k_bias)
 
-        self.v_proj.weight = torch.nn.Parameter(new_v_weight)
-        self.v_proj.bias = torch.nn.Parameter(new_v_bias)
+        self.v_proj.base_model.weight = torch.nn.Parameter(new_v_weight)
+        self.v_proj.base_model.bias = torch.nn.Parameter(new_v_bias)
 
-        self.out_proj.weight = torch.nn.Parameter(new_out_proj_weight)
+        self.out_proj.base_model.weight = torch.nn.Parameter(new_out_proj_weight)
 
         self.num_heads = len(reserve_head_index)
         self.embed_dim = self.head_dim * self.num_heads
-        self.q_proj.out_features = self.embed_dim
-        self.k_proj.out_features = self.embed_dim
-        self.v_proj.out_features = self.embed_dim
+        self.q_proj.base_model.out_features = self.embed_dim
+        self.k_proj.base_model.out_features = self.embed_dim
+        self.v_proj.base_model.out_features = self.embed_dim
+        exit(0)
 
     def _set_skip_embed_dim_check(self):
         self.skip_embed_dim_check = True
 
     def forward(
         self,
+        lang_ids,
         query,
         key: Optional[Tensor],
         value: Optional[Tensor],
@@ -927,9 +913,6 @@ class MultiheadAttentionIN(nn.Module):
         attn_mask: Optional[Tensor] = None,
         before_softmax: bool = False,
         need_head_weights: bool = False,
-        switcher=None,
-        lang_ids=None,
-        itype=None,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Input shape: Time x Batch x Channel
 
@@ -982,7 +965,6 @@ class MultiheadAttentionIN(nn.Module):
             and not self.skip_embed_dim_check
         ):
             assert key is not None and value is not None
-            # print(f"{itype} get in place A")
             return multi_head_attention_forward(
                 query,
                 key,
@@ -994,8 +976,7 @@ class MultiheadAttentionIN(nn.Module):
                 self.bias_v,
                 self.add_zero_attn,
                 self.dropout_module.p,
-                self.out_proj.weight,
-                self.out_proj.bias,
+                self.out_proj,
                 self.training or self.dropout_module.apply_during_inference,
                 key_padding_mask,
                 need_weights,
@@ -1004,8 +985,7 @@ class MultiheadAttentionIN(nn.Module):
                 q_proj_weight=self.q_proj,
                 k_proj_weight=self.k_proj,
                 v_proj_weight=self.v_proj,
-                switcher=switcher,
-                lang_ids=lang_ids,
+                lang_ids=lang_ids
             )
 
         if incremental_state is not None:
@@ -1020,29 +1000,24 @@ class MultiheadAttentionIN(nn.Module):
             saved_state = None
 
         if self.self_attention:
-            # print(f"{itype} get in place B")
-            q = switcher(query, self.q_proj, lang_ids) if switcher else self.q_proj(query)
-            k = switcher(query, self.k_proj, lang_ids) if switcher else self.k_proj(query)
-            v = switcher(query, self.v_proj, lang_ids) if switcher else self.v_proj(query)
-
+            q = self.q_proj(query, lang_ids)
+            k = self.k_proj(query, lang_ids)
+            v = self.v_proj(query, lang_ids)
         elif self.encoder_decoder_attention:
-            # print(f"{itype} get in place C {key is None}")
-            q = switcher(query, self.q_proj, lang_ids) if switcher else self.q_proj(query)
+            # encoder-decoder attention
+            q = self.q_proj(query, lang_ids)
             if key is None:
                 assert value is None
                 k = v = None
             else:
-                # print(f"{itype} get in place E")
-                k = switcher(key, self.k_proj, lang_ids) if switcher else self.k_proj(key)
-                v = switcher(key, self.v_proj, lang_ids) if switcher else self.v_proj(key)
+                k = self.k_proj(key, lang_ids)
+                v = self.v_proj(key, lang_ids)
 
         else:
-            # print(f"{itype} get in place D")
-            raise ValueError("Code base does not support this case!")
             assert key is not None and value is not None
-            q = switcher(query, self.q_proj, lang_ids) if switcher else self.q_proj(query)
-            k = switcher(key, self.k_proj, lang_ids) if switcher else self.k_proj(key)
-            v = switcher(value, self.v_proj, lang_ids) if switcher else self.v_proj(value)
+            q = self.q_proj(query, lang_ids)
+            k = self.k_proj(key, lang_ids)
+            v = self.v_proj(value, lang_ids)
         q *= self.scaling
 
         if self.bias_k is not None:
@@ -1194,7 +1169,7 @@ class MultiheadAttentionIN(nn.Module):
             attn = attn.contiguous().view(tgt_len, bsz, self.embed_dim)
         else:
             attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, self.embed_dim)
-        attn = self.out_proj(attn)
+        attn = self.out_proj(attn, lang_ids)
         attn_weights: Optional[Tensor] = None
         if need_weights:
             attn_weights = attn_weights_float.view(
@@ -1320,5 +1295,3 @@ class MultiheadAttentionIN(nn.Module):
 
         for key, value in items_to_add.items():
             state_dict[key] = value
-
-
