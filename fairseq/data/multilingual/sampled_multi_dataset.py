@@ -41,7 +41,17 @@ def default_virtual_size_func(datasets, ratios, max_scale_up=1.5):
     max_size = sum(sizes) * max_scale_up
     return int(vsize if vsize < max_size else max_size)
 
-
+def default_virtual_size_func2(datasets, ratios, max_scale_up=1.5):
+    sizes = [len(d) for d in datasets]
+    if ratios is None:
+        return sizes
+    largest_idx = np.argmax(sizes)
+    largest_r = ratios[largest_idx]
+    largest_s = sizes[largest_idx]
+    # set virtual sizes relative to the largest dataset
+    virtual_sizes = [int((r / largest_r) * largest_s) for r in ratios]
+    return virtual_sizes
+    
 class CollateFormat(Enum):
     single = 1
     ordered_dict = 2
@@ -84,10 +94,12 @@ class SampledMultiDataset(FairseqDataset):
         split="",
         shared_collater=False,
         shuffle=True,
+        one_lang_one_batch=False,
     ):
         super().__init__()
         self.shared_collater = shared_collater
         self.shuffle = shuffle
+        self.one_lang_one_batch=one_lang_one_batch
 
         if isinstance(datasets, OrderedDict):
             self.keys = list(datasets.keys())
@@ -350,22 +362,44 @@ class SampledMultiDataset(FairseqDataset):
         return self._sizes
 
     def ordered_indices(self):
-        if self.shuffle:
-            indices = np.random.permutation(len(self))
-        else:
+        if self.one_lang_one_batch:
             indices = np.arange(len(self))
+            sizes = self.sizes
+            tgt_sizes = sizes[:, 1] if len(sizes.shape) > 0 and sizes.shape[1] > 1 else None
+            src_sizes = (
+                sizes[:, 0] if len(sizes.shape) > 0 and sizes.shape[1] > 1 else sizes
+            )
 
-        sizes = self.sizes
-        tgt_sizes = sizes[:, 1] if len(sizes.shape) > 0 and sizes.shape[1] > 1 else None
-        src_sizes = (
-            sizes[:, 0] if len(sizes.shape) > 0 and sizes.shape[1] > 1 else sizes
-        )
+            virtual_size_list = default_virtual_size_func2(self.datasets, self.sample_ratios)
+            virtual_size_list = [sum(virtual_size_list[:i]) for i in range(len(virtual_size_list)+1)]
 
-        # sort by target length, then source length
-        if tgt_sizes is not None:
-            indices = indices[np.argsort(tgt_sizes[indices], kind="mergesort")]
-        sort_indices = indices[np.argsort(src_sizes[indices], kind="mergesort")]
-        return sort_indices
+            for i in range(len(virtual_size_list)-1):
+                start = virtual_size_list[i]
+                end = virtual_size_list[i+1]
+                new_indice = indices[start:end]
+                if tgt_sizes is not None:
+                    new_indice = new_indice[np.argsort(tgt_sizes[new_indice], kind="mergesort")]
+                indices[start:end] = new_indice[np.argsort(src_sizes[new_indice], kind="mergesort")]
+            return indices
+            
+        else:
+            if self.shuffle:
+                indices = np.random.permutation(len(self))
+            else:
+                indices = np.arange(len(self))
+
+            sizes = self.sizes
+            tgt_sizes = sizes[:, 1] if len(sizes.shape) > 0 and sizes.shape[1] > 1 else None
+            src_sizes = (
+                sizes[:, 0] if len(sizes.shape) > 0 and sizes.shape[1] > 1 else sizes
+            )
+
+            # sort by target length, then source length
+            if tgt_sizes is not None:
+                indices = indices[np.argsort(tgt_sizes[indices], kind="mergesort")]
+            sort_indices = indices[np.argsort(src_sizes[indices], kind="mergesort")]
+            return sort_indices
+
 
     def prefetch(self, indices):
         prefetch_indices = [[] for _ in range(len(self.datasets))]

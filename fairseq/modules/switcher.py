@@ -36,39 +36,23 @@ class Switcher(nn.Module):
                 return self.base_model(x)
             else:
                 return x
-
+                
         assert lang_ids is not None
         lang_ids = self.dict_len - 1 - lang_ids
-        # selected_id = [(lang_ids == ind).nonzero().view(-1) for ind in range(self.num_lang)]
-        # max_lg_bz = max([len(s) for s in selected_id])
-        
+
         # first go to the base model
         if self.base_model is not None:
             x = self.base_model(x)
 
-        y = torch.zeros(x.shape[0], x.shape[1], self.W[0].weight.shape[0]).type(x.dtype).to(x.device)
-        for ind in range(self.num_lang):
-            selected_id = (lang_ids == ind).nonzero().view(-1)
-            y[:, selected_id, :] = self.W[ind](x[:, selected_id, :])
-        return y
-
-        # y = []
-        # for ind in range(self.num_lang):
-        #     group_x = x.index_select(1, selected_id[ind])
-        #     ## Pad the tensor to ensure the same batch dim before concat
-        #     zeros = torch.zeros([group_x.shape[0], max_lg_bz-group_x.shape[1], group_x.shape[2]]).type(x.dtype).to(x.device)
-        #     group_x = torch.cat([group_x, zeros], dim=1)
-        #     y.append(group_x)
-        
-        # y = torch.stack(y)
-        # y = torch.einsum('abcd,ade->abce', y, self.W)
-
-        # x = torch.zeros(x.shape[0], x.shape[1], y.shape[-1]).type(x.dtype).to(x.device)
-        # for ind in range(self.num_lang):
-        #     x[:, selected_id[ind], :] = y[ind, :, :len(selected_id[ind]) ,:] + self.bias[ind] ## remove zeros
-
-        # return x
-
+        if len(lang_ids) == 1:
+            x = self.W[lang_ids](x)
+            return x
+        else:
+            y = torch.zeros(x.shape[0], x.shape[1], self.base_model.weight.shape[0]).type(x.dtype).to(x.device)
+            for ind in range(self.num_lang):
+                selected_id = (lang_ids == ind).nonzero().view(-1)
+                y[:, selected_id, :] = self.W[ind](x[:, selected_id, :])
+            return y
 
 class Mapper(nn.Module):
     def __init__(self, 

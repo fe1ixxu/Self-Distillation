@@ -529,7 +529,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         cfg.len_dictionary = len(dictionary)
         cfg.num_lang = len(cfg.langs) - 1
 
-        self.W_ffn1 = nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
+        self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
         self.W_ffn2 = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
         self.K_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
         self.V_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
@@ -582,7 +582,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
             ]
         ## fc1, fc2
         active_ffn = [
-                [True, True] if i == cfg.encoder.layers - 1  else [False, False] \
+                [False, True] if i == cfg.encoder.layers - 1  else [False, False] \
                 for i in range(cfg.encoder.layers)                
             ]
 

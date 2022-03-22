@@ -374,7 +374,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         cfg.len_dictionary = len(dictionary)
         cfg.num_lang = len(cfg.langs) - 1
 
-        self.W_ffn1 = nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
+        self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
         self.W_ffn2 = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
         self.K = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
         self.V = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
@@ -383,7 +383,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
 
         self.embed_tokens = embed_tokens
-        self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim, shared_model=self.embed_mapping)
+        # self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim, shared_model=self.embed_mapping)
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
@@ -422,7 +422,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             ]
         ## fc1, fc2
         active_ffn = [
-                [True, True] if i >= 2 else [False, False] \
+                [False, True] if i >= 2 else [False, False] \
                 for i in range(cfg.encoder.layers)                
             ]
 
@@ -468,9 +468,9 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         # embed tokens and positions
         if token_embedding is None:
             token_embedding = self.embed_tokens(src_tokens)
-            token_embedding = token_embedding.transpose(0, 1)
-            token_embedding = self.embed_tokens_post(token_embedding, lang_ids)
-            token_embedding = token_embedding.transpose(0, 1)
+            # token_embedding = token_embedding.transpose(0, 1)
+            # token_embedding = self.embed_tokens_post(token_embedding, lang_ids)
+            # token_embedding = token_embedding.transpose(0, 1)
         x = embed = self.embed_scale * token_embedding
         if self.embed_positions is not None:
             x = embed + self.embed_positions(src_tokens)
@@ -550,8 +550,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         # compute padding mask
-        _, ind_start_without_pad = (src_tokens - self.padding_idx == 0).type(src_tokens.dtype).min(dim=-1)
-        lang_ids = src_tokens.gather(1, ind_start_without_pad.view(-1,1)).view(-1)
+        lang_ids = self.get_lang_ids(src_tokens)
 
         encoder_padding_mask = src_tokens.eq(self.padding_idx)
         has_pads = src_tokens.device.type == "xla" or encoder_padding_mask.any()
@@ -615,6 +614,16 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "lang_ids": [lang_ids],
         }
 
+    def get_lang_ids(self, src_tokens):
+        _, ind_start_without_pad = (src_tokens - self.padding_idx == 0).type(src_tokens.dtype).min(dim=-1)
+        lang_ids = src_tokens.gather(1, ind_start_without_pad.view(-1,1)).view(-1)
+        gather_ids = set([lg.item() for lg in lang_ids])
+        if len(gather_ids) == 1:
+            return lang_ids[0].view(-1)
+        else:
+            print(f"Warning: this batch has more than one ({len(gather_ids)}) languages, which will slow down the training speed!")
+            return lang_ids
+
     @torch.jit.export
     def reorder_encoder_out(self, encoder_out: Dict[str, List[Tensor]], new_order):
         """
@@ -675,7 +684,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "src_tokens": src_tokens,  # B x T
             "src_lengths": src_lengths,  # B x 1
             "lang_ids": lang_ids # B
-        }
+        }            
 
     def max_positions(self):
         """Maximum input length supported by the encoder."""

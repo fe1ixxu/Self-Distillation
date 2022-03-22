@@ -63,6 +63,7 @@ class MultilingualDatasetManager(object):
         self.args = args
         self.seed = args.seed
         self.lang_pairs = lang_pairs
+        self.one_lang_one_batch = args.one_lang_one_batch
         self.extra_lang_pairs = (
             list({p for _, v in args.extra_lang_pairs.items() for p in v.split(",")})
             if args.extra_lang_pairs
@@ -279,6 +280,12 @@ class MultilingualDatasetManager(object):
             "up data loading and have specific dynamic sampling strategy interval",
         )
 
+        parser.add_argument(
+            "--one_lang_one_batch",
+            action="store_true",
+            help="load the binarized alignments",
+        )
+        
     @classmethod
     def load_langs(cls, args, **kwargs):
         if args.lang_dict and args.langs:
@@ -1139,6 +1146,7 @@ class MultilingualDatasetManager(object):
                 split=split,
                 # if not using lang_tok altering, simplified to use the same collater
                 shared_collater=self._shared_collater(),
+                one_lang_one_batch=self.one_lang_one_batch
             )
         else:
             return self.load_into_concat_dataset(split, datasets, data_param_list)
