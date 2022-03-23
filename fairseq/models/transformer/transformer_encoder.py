@@ -417,12 +417,12 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = nn.ModuleList([])
         ## k,v,q,out_proj
         active_proj = [
-                [False, True, False, True] if i <= 3 else [False, True, False, True] \
+                [0,0,0,0] if i <= 3 else [1,0,1,0] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2
         active_ffn = [
-                [False, False] if i >= 2 else [False, False] \
+                [0,1] if i <= 4  else [0,0] \
                 for i in range(cfg.encoder.layers)                
             ]
 

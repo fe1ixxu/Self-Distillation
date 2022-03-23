@@ -15,7 +15,6 @@ class Switcher(nn.Module):
         base_model has to be a Linear model
         """
         super().__init__()
-        assert isinstance(active, bool)
 
         self.base_model = base_model
         self.dict_len = dict_len

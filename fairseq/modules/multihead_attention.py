@@ -780,8 +780,9 @@ class MultiheadAttentionIN(nn.Module):
                     nn.init.xavier_uniform_(self.q_proj.W[i].weight)
 
         nn.init.xavier_uniform_(self.out_proj.base_model.weight)
-        for i in range(self.out_proj.num_lang):
-            nn.init.xavier_uniform_(self.out_proj.W[i].weight)
+        if self.out_proj.active:
+            for i in range(self.out_proj.num_lang):
+                nn.init.xavier_uniform_(self.out_proj.W[i].weight)
 
         if self.out_proj.base_model.bias is not None:
             nn.init.constant_(self.out_proj.base_model.bias, 0.0)
