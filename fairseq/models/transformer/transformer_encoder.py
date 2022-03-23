@@ -621,7 +621,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         if len(gather_ids) == 1:
             return lang_ids[0].view(-1)
         else:
-            print(f"Warning: this batch has more than one ({len(gather_ids)}) languages, which will slow down the training speed!")
             return lang_ids
 
     @torch.jit.export
