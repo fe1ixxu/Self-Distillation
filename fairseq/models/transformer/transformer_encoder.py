@@ -417,12 +417,12 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = nn.ModuleList([])
         ## k,v,q,out_proj
         active_proj = [
-                [True, True, True, True] if i <= 3 else [False, True, False, True] \
+                [False, True, False, True] if i <= 3 else [False, True, False, True] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2
         active_ffn = [
-                [False, True] if i >= 2 else [False, False] \
+                [False, False] if i >= 2 else [False, False] \
                 for i in range(cfg.encoder.layers)                
             ]
 
@@ -665,6 +665,8 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         
         if len(encoder_out["lang_ids"]) == 0:
             lang_ids = []
+        elif len(encoder_out["lang_ids"][0]) == 1:
+            lang_ids = encoder_out["lang_ids"]
         else:
             if encoder_out["lang_ids"][0] is not None:
                 lang_ids = [(encoder_out["lang_ids"][0]).index_select(0, new_order)]
@@ -683,7 +685,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "encoder_states": encoder_states,  # List[T x B x C]
             "src_tokens": src_tokens,  # B x T
             "src_lengths": src_lengths,  # B x 1
-            "lang_ids": lang_ids # B
+            "lang_ids": lang_ids # B or 1
         }            
 
     def max_positions(self):

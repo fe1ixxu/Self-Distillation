@@ -36,7 +36,6 @@ class Switcher(nn.Module):
                 return self.base_model(x)
             else:
                 return x
-                
         assert lang_ids is not None
         lang_ids = self.dict_len - 1 - lang_ids
 
