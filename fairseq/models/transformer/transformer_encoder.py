@@ -25,7 +25,7 @@ from torch import Tensor
 from fairseq.models.transformer import (
     TransformerConfig,
 )
-from fairseq.modules.switcher import Switcher
+from fairseq.modules.switcher import Switcher, Mapper
 
 # rewrite name for backward compatibility in `make_generation_fast_`
 def module_name_fordropout(module_name: str) -> str:
@@ -375,12 +375,12 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         cfg.num_lang = len(cfg.langs) - 1
 
         self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
-        self.W_ffn2 = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.K = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.V = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.Q = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.Out_Proj = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang)
+        self.K = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.V = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.Q = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.Out_Proj = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        # self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
 
         self.embed_tokens = embed_tokens
         # self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim, shared_model=self.embed_mapping)

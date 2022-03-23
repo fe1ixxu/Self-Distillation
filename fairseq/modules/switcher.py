@@ -38,48 +38,50 @@ class Switcher(nn.Module):
         assert lang_ids is not None
         lang_ids = self.dict_len - 1 - lang_ids
 
-        # first go to the base model
+        out_from_shared_model = self.W(x, lang_ids)
+
+        # go to the base model
         if self.base_model is not None:
             x = self.base_model(x)
 
-        if len(lang_ids) == 1:
-            x = self.W[lang_ids](x)
-            return x
-        else:
-            y = torch.zeros(x.shape[0], x.shape[1], self.base_model.weight.shape[0]).type(x.dtype).to(x.device)
-            for ind in range(self.num_lang):
-                selected_id = (lang_ids == ind).nonzero().view(-1)
-                y[:, selected_id, :] = self.W[ind](x[:, selected_id, :])
-            return y
+        x = x + out_from_shared_model
+
+        return x
+
 
 class Mapper(nn.Module):
-    def __init__(self, 
-        dict_len,
-        dim=1024,
-        num_ls=8,
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        num_lang,
+        hidden_dim=256, 
     ):
         super().__init__()
-        self.num_ls = num_ls
-        self.dim = dim
-        self.dict_len = dict_len
-        self.w = nn.ModuleList([nn.Linear(dim, dim) for _ in range(num_ls)])
+        self.num_lang=num_lang
+        self.output_dim = output_dim
+        self.W1 = nn.ModuleList([nn.Linear(input_dim, hidden_dim) for _ in range(num_lang)])
+        self.W2 = nn.ModuleList([nn.Linear(hidden_dim, output_dim) for _ in range(num_lang)])
 
     def forward(self, x, lang_ids):
         """
         x: [seq_len, bz, dim] Take the first index of feature as input
         """
 
-        lang_ids = self.dict_len - 1 - lang_ids
-        group = []
-        for ind in range(1, self.num_ls+1):
-            group.append(( lang_ids == ind ).type(torch.long))
-
-        for ind in range(self.num_ls):
-            selected_id = (group[ind]==1).nonzero().view(-1)
-            if len(selected_id) > 0:
-                ## in case no selected id in this iteration
-                x[:, selected_id, :] = self.w[ind](x[:, selected_id, :])
-        return x
+        if len(lang_ids) == 1:
+            x = self.W1[lang_ids](x)
+            x = self.W2[lang_ids](F.relu(x))
+            return x
+        else:
+            y = torch.zeros(x.shape[0], x.shape[1], self.output_dim).type(x.dtype).to(x.device)
+            for ind in range(self.num_lang):
+                selected_id = (lang_ids == ind).nonzero().view(-1)
+                if len(selected_id) > 0:
+                    slice_x = x[:, selected_id, :]
+                    slice_x = self.W1[ind](slice_x)
+                    slice_x = self.W2[ind](F.relu(slice_x))
+                    y[:, selected_id, :] = slice_x
+            return y
 
 
 # class Switcher(nn.Module):

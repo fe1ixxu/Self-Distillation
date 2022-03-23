@@ -26,7 +26,7 @@ from fairseq.modules import (
 )
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
-
+from fairseq.modules.switcher import Switcher, Mapper
 
 # rewrite name for backward compatibility in `make_generation_fast_`
 def module_name_fordropout(module_name: str) -> str:
@@ -530,15 +530,15 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         cfg.num_lang = len(cfg.langs) - 1
 
         self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
-        self.W_ffn2 = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.K_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.V_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.Q_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.K_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.V_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.Q_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.Out_Proj_self = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
-        self.Out_Proj_encoder = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
+        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang)
+        self.K_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.V_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.Q_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.K_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.V_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.Q_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.Out_Proj_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.Out_Proj_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
 
         if not cfg.adaptive_input and cfg.quant_noise.pq > 0:
             self.quant_noise = apply_quant_noise_(
