@@ -155,7 +155,7 @@ fairseq-train ../data/iwslt14/data-bin/ --arch transformer_iwslt_de_en_IN --task
 --langs de,es,it,nl,pl,ar,fa,he,en \
 --lang-pairs de-en,es-en,it-en,nl-en,pl-en,ar-en,fa-en,he-en,en-de,en-es,en-it,en-nl,en-pl,en-ar,en-fa,en-he \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
---lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 30000 --dropout 0.1 --attention-dropout 0.1 \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 2000 --max-update 40000 --dropout 0.1 --attention-dropout 0.1 \
 --weight-decay 0.0 --max-tokens 8192 --update-freq 4 --patience 4 \
 --save-interval-updates 1000 --keep-interval-updates 2 --no-epoch-checkpoints --log-format simple --log-interval 100 \
 --ddp-backend no_c10d --fp16  --fp16-init-scale 16 --one_lang_one_batch \
