@@ -273,19 +273,40 @@ MODEL_PATH=$1
 
 
 # opus subset one to many:
+# DATA_DIR=../data/opus-100/rebuilt-subset2/
+# for TGT in id ms pl cs fr it uk ru fi et lv lt; do
+#     SRC=en
+#     FSRC=${DATA_DIR}/test.${SRC}-${TGT}.${SRC}
+#     FTGT=${DATA_DIR}/raw/test.${SRC}-${TGT}.${TGT}
+#     FOUT=${MODEL_PATH}/results/test.${SRC}-${TGT}.${TGT}
+#     mkdir -p ${MODEL_PATH}/results
+
+#     cat $FSRC | python scripts/truncate.py | \
+#     python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+#         --task translation_multi_simple_epoch --encoder-langtok tgt --path $MODEL_PATH/checkpoint_best.pt \
+#         --langs en,id,ms,pl,cs,fr,it,uk,ru,fi,et,lv,lt \
+#         --lang-pairs en-id,en-ms,en-pl,en-cs,en-fr,en-it,en-uk,en-ru,en-fi,en-et,en-lv,en-lt \
+#         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
+#         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
+#     grep -P "^H" | cut -f 3- > $FOUT
+
+#     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
+
+# done
+
 DATA_DIR=../data/opus-100/rebuilt-subset2/
-for TGT in id ms pl cs fr it uk ru fi et lv lt; do
-    SRC=en
-    FSRC=${DATA_DIR}/test.${SRC}-${TGT}.${SRC}
-    FTGT=${DATA_DIR}/raw/test.${SRC}-${TGT}.${TGT}
-    FOUT=${MODEL_PATH}/results/test.${SRC}-${TGT}.${TGT}
+for SRC in id ms pl cs fr it uk ru fi et lv lt ; do
+    TGT=en
+    FSRC=${DATA_DIR}/test.${TGT}-${SRC}.${SRC}
+    FTGT=${DATA_DIR}/raw/test.${TGT}-${SRC}.${TGT}
+    FOUT=${MODEL_PATH}/results/test.${TGT}-${SRC}.${TGT}
     mkdir -p ${MODEL_PATH}/results
 
     cat $FSRC | python scripts/truncate.py | \
-    python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
-        --task translation_multi_simple_epoch --encoder-langtok tgt --path $MODEL_PATH/checkpoint_best.pt \
+    CUDA_VISIBLE_DEVICES=2 python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+        --task translation_multi_simple_epoch --encoder-langtok src --path $MODEL_PATH/checkpoint_best.pt \
         --langs en,id,ms,pl,cs,fr,it,uk,ru,fi,et,lv,lt \
-        --lang-pairs en-id,en-ms,en-pl,en-cs,en-fr,en-it,en-uk,en-ru,en-fi,en-et,en-lv,en-lt \
+        --lang-pairs id-en,ms-en,pl-en,cs-en,fr-en,it-en,uk-en,ru-en,fi-en,et-en,lv-en,lt-en \
         --source-lang $SRC --target-lang $TGT --buffer-size 1024 --batch-size 100 \
         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece --no-progress-bar | \
     grep -P "^H" | cut -f 3- > $FOUT
