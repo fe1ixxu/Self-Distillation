@@ -375,11 +375,11 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         cfg.num_lang = len(cfg.langs) if "-en" in cfg.lang_pairs and "en-" in cfg.lang_pairs else len(cfg.langs) - 1
 
         self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
-        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang)
-        self.K = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.V = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.Q = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.Out_Proj = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.K = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.V = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Q = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Out_Proj = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
         # self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
 
         self.embed_tokens = embed_tokens

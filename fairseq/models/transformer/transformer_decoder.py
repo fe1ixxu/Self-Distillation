@@ -530,15 +530,15 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         cfg.num_lang = len(cfg.langs) if "-en" in cfg.lang_pairs and "en-" in cfg.lang_pairs else len(cfg.langs) - 1
 
         self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
-        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang)
-        self.K_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.V_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.Q_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.K_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.V_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.Q_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.Out_Proj_self = Mapper(embed_dim, embed_dim, cfg.num_lang)
-        self.Out_Proj_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang)
+        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.K_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.V_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Q_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.K_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.V_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Q_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Out_Proj_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Out_Proj_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
 
         if not cfg.adaptive_input and cfg.quant_noise.pq > 0:
             self.quant_noise = apply_quant_noise_(

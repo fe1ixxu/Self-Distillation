@@ -220,7 +220,8 @@ class TransformerModelIN(TransformerModelBaseIN):
         gen_parser_from_dataclass(
             parser, TransformerConfig(), delete_default=True, with_prefix=""
         )
-
+        parser.add_argument('--switcher-hidden-size', type=int, metavar='N', default=256, \
+                            help='The hidden size of Mappers')
     @classmethod
     def build_model(cls, args, task):
         """Build a new model instance."""
