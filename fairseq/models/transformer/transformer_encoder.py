@@ -376,10 +376,10 @@ class TransformerEncoderBaseIN(FairseqEncoder):
 
         self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
         self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.K = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.V = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Q = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Out_Proj = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.K = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.V = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Q = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Out_Proj = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
         # self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
 
         self.embed_tokens = embed_tokens
@@ -417,7 +417,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = nn.ModuleList([])
         ## k,v,q,out_proj
         active_proj = [
-                [0,1,0,1] if i <= 10 else [0,1,0,1] \
+                [1,0,1,0] if i <= 10 else [0,1,0,1] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2

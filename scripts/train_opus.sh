@@ -185,29 +185,12 @@ ulimit -n 2048
 
 
 ## Subset New One to Many:
-# hidden_size=${1}
-# SAVE_DIR=../checkpoints/opus/subset_new_parallel-V-${hidden_size}/one-to-many/
-# fairseq-train  ../data/opus-100/rebuilt-subset2/data-bin/ --arch transformer_IN --task translation_multi_simple_epoch \
-# --sampling-method temperature --sampling-temperature 1 --encoder-langtok tgt \
-# --langs en,id,ms,pl,cs,fr,it,uk,ru,fi,et,lv,lt \
-# --lang-pairs  en-id,en-ms,en-pl,en-cs,en-fr,en-it,en-uk,en-ru,en-fi,en-et,en-lv,en-lt \
-# --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
-# --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 3000 --max-update 40000 --dropout 0.1 --attention-dropout 0.1 \
-# --weight-decay 0.0 --max-tokens 8192 --update-freq 8 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
-# --log-format simple --log-interval 100 --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 10 \
-# --save-dir ${SAVE_DIR} --max-source-positions 256 --one_lang_one_batch \
-# --max-target-positions 256 --skip-invalid-size-inputs-valid-test \
-# --tensorboard-logdir ${SAVE_DIR}/log/ \
-# --switcher-hidden-size ${hidden_size}
-
-
-## Subset New Many to one
-hidden_size=${1}
-SAVE_DIR=../checkpoints/opus/subset_new_parallel-V-${hidden_size}/many-to-one/
-fairseq-train  ../data/opus-100/rebuilt-subset2/data-bin/ --arch transformer_IN --task translation_multi_simple_epoch \
---sampling-method temperature --sampling-temperature 1 --encoder-langtok src \
+hidden_size=512
+SAVE_DIR=../checkpoints/opus/subset_new_parallel-KQ-${hidden_size}_3/one-to-many/
+fairseq-train  ../data/opus-100/rebuilt-subset3/data-bin/ --arch transformer_IN --task translation_multi_simple_epoch \
+--sampling-method temperature --sampling-temperature 1 --encoder-langtok tgt \
 --langs en,id,ms,pl,cs,fr,it,uk,ru,fi,et,lv,lt \
---lang-pairs  id-en,ms-en,pl-en,cs-en,fr-en,it-en,uk-en,ru-en,fi-en,et-en,lv-en,lt-en \
+--lang-pairs  en-id,en-ms,en-pl,en-cs,en-fr,en-it,en-uk,en-ru,en-fi,en-et,en-lv,en-lt \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
 --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 3000 --max-update 40000 --dropout 0.1 --attention-dropout 0.1 \
 --weight-decay 0.0 --max-tokens 8192 --update-freq 8 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
@@ -216,3 +199,20 @@ fairseq-train  ../data/opus-100/rebuilt-subset2/data-bin/ --arch transformer_IN 
 --max-target-positions 256 --skip-invalid-size-inputs-valid-test \
 --tensorboard-logdir ${SAVE_DIR}/log/ \
 --switcher-hidden-size ${hidden_size}
+
+
+## Subset New Many to one
+# hidden_size=${1}
+# SAVE_DIR=../checkpoints/opus/subset_new_parallel-V-${hidden_size}/many-to-one/
+# fairseq-train  ../data/opus-100/rebuilt-subset2/data-bin/ --arch transformer_IN --task translation_multi_simple_epoch \
+# --sampling-method temperature --sampling-temperature 1 --encoder-langtok src \
+# --langs en,id,ms,pl,cs,fr,it,uk,ru,fi,et,lv,lt \
+# --lang-pairs  id-en,ms-en,pl-en,cs-en,fr-en,it-en,uk-en,ru-en,fi-en,et-en,lv-en,lt-en \
+# --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+# --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 3000 --max-update 40000 --dropout 0.1 --attention-dropout 0.1 \
+# --weight-decay 0.0 --max-tokens 8192 --update-freq 8 --save-interval-updates 300 --keep-interval-updates 2 --no-epoch-checkpoints \
+# --log-format simple --log-interval 100 --fp16  --fp16-init-scale 16 --ddp-backend no_c10d --patience 10 \
+# --save-dir ${SAVE_DIR} --max-source-positions 256 --one_lang_one_batch \
+# --max-target-positions 256 --skip-invalid-size-inputs-valid-test \
+# --tensorboard-logdir ${SAVE_DIR}/log/ \
+# --switcher-hidden-size ${hidden_size}

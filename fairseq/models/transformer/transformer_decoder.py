@@ -531,14 +531,14 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
 
         self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
         self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.K_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.V_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Q_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.K_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.V_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Q_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Out_Proj_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Out_Proj_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.K_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.V_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Q_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.K_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.V_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Q_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Out_Proj_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
+        self.Out_Proj_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
 
         if not cfg.adaptive_input and cfg.quant_noise.pq > 0:
             self.quant_noise = apply_quant_noise_(
@@ -572,12 +572,12 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         self.cross_self_attention = cfg.cross_self_attention
         ## k,v,q,out_proj
         active_proj_self = [
-                [0,1,0,1] if i <= 10 else [0,0,0,0] \
+                [1,0,1,0] if i <= 10 else [0,0,0,0] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## k,v,q,out_proj
         active_proj_encoder = [
-                [0,1,0,1] \
+                [1,0,1,0] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2
