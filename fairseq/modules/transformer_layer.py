@@ -583,7 +583,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         self.quant_noise = cfg.quant_noise.pq
         self.quant_noise_block_size = cfg.quant_noise.pq_block_size
         self.expert_num = cfg.expert_num
-        self.self_attn = self.build_self_attention(self.embed_dim, self.expert_num, active_proj)
+        self.self_attn = self.build_self_attention(self.embed_dim, cfg, self.expert_num, active_proj)
         self.self_attn_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
         self.dropout_module = FairseqDropout(
             cfg.dropout, module_name=self.__class__.__name__
@@ -691,7 +691,7 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         self.fc2.bias = torch.nn.Parameter(new_fc2_bias)
         raise ValueError("Not for _prune_fc_layer")
 
-    def build_self_attention(self, embed_dim, expert_num, active_proj):
+    def build_self_attention(self, embed_dim, cfg, expert_num, active_proj):
         return MultiheadAttentionIN(
             embed_dim,
             cfg.encoder.attention_heads,
@@ -830,6 +830,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self.expert_num = cfg.expert_num
         self.self_attn = self.build_self_attention(
             self.embed_dim,
+            cfg,
             self.expert_num,
             active_proj_self,
             add_bias_kv=add_bias_kv,
@@ -865,7 +866,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             self.encoder_attn = None
             self.encoder_attn_layer_norm = None
         else:
-            self.encoder_attn = self.build_encoder_attention(self.embed_dim, self.expert_num, active_proj_encoder)
+            self.encoder_attn = self.build_encoder_attention(self.embed_dim, cfg, self.expert_num, active_proj_encoder)
             self.encoder_attn_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
         self.ffn_layernorm = (
@@ -924,12 +925,12 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         )
 
     def build_self_attention(
-        self, embed_dim, expert_num, active_proj_self, add_bias_kv=False, add_zero_attn=False,
+        self, embed_dim, cfg, expert_num, active_proj_self, add_bias_kv=False, add_zero_attn=False,
     ):
         return MultiheadAttentionIN(
             embed_dim,
             cfg.decoder.attention_heads,
-            expert_num=expert_num
+            expert_num=expert_num,
             active=active_proj_self,
             dropout=cfg.attention_dropout,
             add_bias_kv=add_bias_kv,
@@ -939,11 +940,12 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             qn_block_size=self.quant_noise_block_size,
         )
 
-    def build_encoder_attention(self, embed_dim, expert_num, active_proj_encoder):
+    def build_encoder_attention(self, embed_dim, cfg, expert_num, active_proj_encoder):
         return MultiheadAttentionIN(
             embed_dim,
             cfg.decoder.attention_heads,
             expert_num=expert_num,
+            active=active_proj_encoder,
             kdim=cfg.encoder.embed_dim,
             vdim=cfg.encoder.embed_dim,
             dropout=cfg.attention_dropout,
