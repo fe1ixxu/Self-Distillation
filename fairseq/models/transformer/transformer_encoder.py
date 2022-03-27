@@ -370,20 +370,8 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         embed_dim = embed_tokens.embedding_dim
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = cfg.max_source_positions
-        
-        cfg.len_dictionary = len(dictionary)
-        cfg.num_lang = len(cfg.langs) if "-en" in cfg.lang_pairs and "en-" in cfg.lang_pairs else len(cfg.langs) - 1
-
-        self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
-        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.K = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.V = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Q = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Out_Proj = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        # self.embed_mapping = nn.ModuleList([nn.Linear(embed_dim, embed_dim) for _ in range(cfg.num_lang)])
 
         self.embed_tokens = embed_tokens
-        # self.embed_tokens_post = Switcher(None, cfg.len_dictionary, cfg.num_lang, active=True, dim=embed_dim, shared_model=self.embed_mapping)
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
@@ -417,12 +405,12 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = nn.ModuleList([])
         ## k,v,q,out_proj
         active_proj = [
-                [1,0,1,0] if i <= 10 else [0,1,0,1] \
+                [0,1,0,1] if i <= 10 else [0,1,0,1] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2
         active_ffn = [
-                [0,1] if i >= 0  else [0,0] \
+                [0,0] if i >= 0  else [0,0] \
                 for i in range(cfg.encoder.layers)                
             ]
 
@@ -450,7 +438,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         active_ffn,
         ):
         layer = transformer_layer.TransformerEncoderLayerBaseIN(
-            cfg,  active_proj, active_ffn, self.W_ffn1, self.W_ffn2, self.K, self.V, self.Q, self.Out_Proj, return_fc=self.return_fc
+            cfg,  active_proj, active_ffn, return_fc=self.return_fc
         )
         checkpoint = cfg.checkpoint_activations
         if checkpoint:
@@ -463,14 +451,11 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         return layer
 
     def forward_embedding(
-        self, src_tokens, lang_ids, token_embedding: Optional[torch.Tensor] = None
+        self, src_tokens, token_embedding: Optional[torch.Tensor] = None
     ):
         # embed tokens and positions
         if token_embedding is None:
             token_embedding = self.embed_tokens(src_tokens)
-            # token_embedding = token_embedding.transpose(0, 1)
-            # token_embedding = self.embed_tokens_post(token_embedding, lang_ids)
-            # token_embedding = token_embedding.transpose(0, 1)
         x = embed = self.embed_scale * token_embedding
         if self.embed_positions is not None:
             x = embed + self.embed_positions(src_tokens)
@@ -550,12 +535,11 @@ class TransformerEncoderBaseIN(FairseqEncoder):
                   Only populated if *return_all_hiddens* is True.
         """
         # compute padding mask
-        lang_ids = self.get_lang_ids(src_tokens)
-
+        
         encoder_padding_mask = src_tokens.eq(self.padding_idx)
         has_pads = src_tokens.device.type == "xla" or encoder_padding_mask.any()
 
-        x, encoder_embedding = self.forward_embedding(src_tokens, lang_ids, token_embeddings)
+        x, encoder_embedding = self.forward_embedding(src_tokens, token_embeddings)
 
         # account for padding while computing the representation
         if has_pads:
@@ -574,7 +558,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         for layer in self.layers:
             lr = layer(
                 x, encoder_padding_mask=encoder_padding_mask if has_pads else None,
-                lang_ids = lang_ids,
             )
 
             if isinstance(lr, tuple) and len(lr) == 2:
@@ -611,17 +594,8 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "fc_results": fc_results,  # List[T x B x C]
             "src_tokens": [],
             "src_lengths": [src_lengths],
-            "lang_ids": [lang_ids],
         }
 
-    def get_lang_ids(self, src_tokens):
-        _, ind_start_without_pad = (src_tokens - self.padding_idx == 0).type(src_tokens.dtype).min(dim=-1)
-        lang_ids = src_tokens.gather(1, ind_start_without_pad.view(-1,1)).view(-1)
-        gather_ids = set([lg.item() for lg in lang_ids])
-        if len(gather_ids) == 1:
-            return lang_ids[0].view(-1)
-        else:
-            return lang_ids
 
     @torch.jit.export
     def reorder_encoder_out(self, encoder_out: Dict[str, List[Tensor]], new_order):
@@ -662,16 +636,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
         else:
             src_lengths = [(encoder_out["src_lengths"][0]).index_select(0, new_order)]
         
-        if len(encoder_out["lang_ids"]) == 0:
-            lang_ids = []
-        elif len(encoder_out["lang_ids"][0]) == 1:
-            lang_ids = encoder_out["lang_ids"]
-        else:
-            if encoder_out["lang_ids"][0] is not None:
-                lang_ids = [(encoder_out["lang_ids"][0]).index_select(0, new_order)]
-            else:
-                lang_ids = [None]
-
         encoder_states = encoder_out["encoder_states"]
         if len(encoder_states) > 0:
             for idx, state in enumerate(encoder_states):
@@ -684,7 +648,6 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             "encoder_states": encoder_states,  # List[T x B x C]
             "src_tokens": src_tokens,  # B x T
             "src_lengths": src_lengths,  # B x 1
-            "lang_ids": lang_ids # B or 1
         }            
 
     def max_positions(self):

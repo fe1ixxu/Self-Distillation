@@ -3,13 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from fairseq.modules import LayerNorm
 class Switcher(nn.Module):
-    def __init__(self,
+    def __init__(
+        self,
         base_model,
-        dict_len,
-        num_lang,
-        active,
-        dim=None,
-        shared_model=None
     ):
         """
         base_model has to be a Linear model
@@ -17,37 +13,27 @@ class Switcher(nn.Module):
         super().__init__()
 
         self.base_model = base_model
-        self.dict_len = dict_len
-        self.num_lang = num_lang
-        self.active = active
+        self.expert_num = len(base_model)
 
-        if self.active:
-            self.W = shared_model
-
-    def forward(self, x, lang_ids):
+    def forward(self, x):
         """
         x: [seq_len, bz, dim] Take the first index of feature as input
         dim1: input dim
         dim2: output dim
         """
-        if not self.active:
-            if self.base_model is not None:
-                return self.base_model(x)
+        if self.training:
+            if self.expert_num == 1:
+                x = self.base_model[0](x)
             else:
-                return x
-        assert lang_ids is not None
-        lang_ids = self.dict_len - 1 - lang_ids
-
-        out_from_shared_model = self.W(x, lang_ids)
-
-        # go to the base model
-        if self.base_model is not None:
-            x = self.base_model(x)
-
-        x = x + out_from_shared_model
-
+                expert_id = torch.randint(low=0, high=self.expert_num, size=(1,)).item()
+                x = self.base_model[expert_id](x)
+        else:
+            results = []
+            for expert_id in range(self.expert_num):
+                results.append(self.base_model[expert_id](x))
+            results = torch.stack(results)
+            x = results.mean(dim=0)
         return x
-
 
 class Mapper(nn.Module):
     def __init__(

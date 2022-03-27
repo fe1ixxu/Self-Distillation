@@ -481,7 +481,6 @@ def multi_head_attention_forward(
     static_k: Optional[Tensor] = None,
     static_v: Optional[Tensor] = None,
     average_attn_weights: bool = True,
-    lang_ids=None,
 ) -> Tuple[Tensor, Optional[Tensor]]:
     r"""
     Args:
@@ -545,7 +544,6 @@ def multi_head_attention_forward(
           :math:`S` is the source sequence length. If ``average_weights=False``, returns attention weights per
           head of shape :math:`(num_heads, L, S)` when input is unbatched or :math:`(N, num_heads, L, S)`.
     """
-    assert lang_ids is not None
     is_batched = _mha_shape_check(query, key, value, key_padding_mask, attn_mask, num_heads)
 
     # For unbatched input, we unsqueeze at the expected batch-dim to pretend that the input
@@ -583,9 +581,9 @@ def multi_head_attention_forward(
     assert q_proj_weight is not None, "use_separate_proj_weight is True but q_proj_weight is None"
     assert k_proj_weight is not None, "use_separate_proj_weight is True but k_proj_weight is None"
     assert v_proj_weight is not None, "use_separate_proj_weight is True but v_proj_weight is None"
-    q = q_proj_weight(query, lang_ids)
-    k = k_proj_weight(key, lang_ids)
-    v = v_proj_weight(value, lang_ids)
+    q = q_proj_weight(query)
+    k = k_proj_weight(key)
+    v = v_proj_weight(value)
 
     # prep attention mask
     if attn_mask is not None:
@@ -692,7 +690,7 @@ def multi_head_attention_forward(
     attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p)
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     # attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
-    attn_output = out_proj(attn_output, lang_ids)
+    attn_output = out_proj(attn_output)
 
     if need_weights:
         # optionally average attention weights over heads

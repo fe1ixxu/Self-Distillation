@@ -526,20 +526,6 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
 
         self.embed_scale = 1.0 if cfg.no_scale_embedding else math.sqrt(embed_dim)
 
-        cfg.len_dictionary = len(dictionary)
-        cfg.num_lang = len(cfg.langs) if "-en" in cfg.lang_pairs and "en-" in cfg.lang_pairs else len(cfg.langs) - 1
-
-        self.W_ffn1 = None #nn.ModuleList([nn.Linear(cfg.encoder.ffn_embed_dim, cfg.encoder.ffn_embed_dim) for _ in range(cfg.num_lang)])
-        self.W_ffn2 = Mapper(cfg.encoder.ffn_embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.K_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.V_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Q_self = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.K_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.V_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Q_encoder = Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Out_Proj_self = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-        self.Out_Proj_encoder = None #Mapper(embed_dim, embed_dim, cfg.num_lang, cfg.switcher_hidden_size)
-
         if not cfg.adaptive_input and cfg.quant_noise.pq > 0:
             self.quant_noise = apply_quant_noise_(
                 nn.Linear(embed_dim, embed_dim, bias=False),
@@ -572,17 +558,17 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         self.cross_self_attention = cfg.cross_self_attention
         ## k,v,q,out_proj
         active_proj_self = [
-                [1,0,1,0] if i <= 10 else [0,0,0,0] \
+                [0,1,0,1] if i <= 10 else [0,1,0,1] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## k,v,q,out_proj
         active_proj_encoder = [
-                [1,0,1,0] \
+                [0,1,0,1] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2
         active_ffn = [
-                [0,1] if i <= 10 or i >=4  else [False, False] \
+                [0,0] if i <= 10 or i >=4  else [False, False] \
                 for i in range(cfg.encoder.layers)                
             ]
 
@@ -653,17 +639,7 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
             cfg, 
             active_proj_self, 
             active_proj_encoder, 
-            active_ffn,
-            self.W_ffn1,
-            self.W_ffn2,
-            self.K_self,
-            self.V_self,
-            self.Q_self,
-            self.K_encoder,
-            self.V_encoder,
-            self.Q_encoder,
-            self.Out_Proj_self,
-            self.Out_Proj_encoder,         
+            active_ffn,        
             no_encoder_attn
         )
         checkpoint = cfg.checkpoint_activations
@@ -826,7 +802,6 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         # decoder layers
         attn: Optional[Tensor] = None
         inner_states: List[Optional[Tensor]] = [x]
-        lang_ids = encoder_out["lang_ids"][0]
         for idx, layer in enumerate(self.layers):
             if incremental_state is None and not full_context_alignment:
                 self_attn_mask = self.buffered_future_mask(x)
@@ -842,7 +817,6 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
                 self_attn_padding_mask=self_attn_padding_mask,
                 need_attn=bool((idx == alignment_layer)),
                 need_head_weights=bool((idx == alignment_layer)),
-                lang_ids=lang_ids,
             )
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:

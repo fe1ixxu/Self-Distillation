@@ -575,14 +575,15 @@ class TransformerEncoderLayerBaseIN(nn.Module):
     """
 
     def __init__(
-        self, cfg, active_proj, active_ffn, W_ffn1, W_ffn2, K, V, Q, Out_Proj, return_fc=False):
+        self, cfg, active_proj, active_ffn, return_fc=False):
         super().__init__()
         self.cfg = cfg
         self.return_fc = return_fc
         self.embed_dim = cfg.encoder.embed_dim
         self.quant_noise = cfg.quant_noise.pq
         self.quant_noise_block_size = cfg.quant_noise.pq_block_size
-        self.self_attn = self.build_self_attention(self.embed_dim, active_proj, cfg, K, V, Q, Out_Proj)
+        self.expert_num = cfg.expert_num
+        self.self_attn = self.build_self_attention(self.embed_dim, self.expert_num, active_proj)
         self.self_attn_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
         self.dropout_module = FairseqDropout(
             cfg.dropout, module_name=self.__class__.__name__
@@ -601,42 +602,36 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             cfg.encoder.ffn_embed_dim,
             self.quant_noise,
             self.quant_noise_block_size,
-            active_ffn,
-            cfg,
-            W_ffn1
+            self.expert_num,
+            active_ffn
         )
         self.fc2 = self.build_fc2(
             cfg.encoder.ffn_embed_dim,
             self.embed_dim,
             self.quant_noise,
             self.quant_noise_block_size,
-            active_ffn,
-            cfg,
-            W_ffn2
+            self.expert_num,
+            active_ffn
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
-    def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size, active_ffn, cfg, W_ffn1):
+    def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size, expert_num, active_ffn):
+        num = expert_num if active_ffn[0] else 1
         return Switcher(
-            quant_noise(
-            nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            ),
-            cfg.len_dictionary,
-            cfg.num_lang,
-            active_ffn[0],
-            shared_model=W_ffn1
+            nn.ModuleList([
+                quant_noise(
+                nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
+                ) for _ in range(num)])
         )
 
-    def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size, active_ffn, cfg, W_ffn2):
+    def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size, expert_num, active_ffn):
+        num = expert_num if active_ffn[1] else 1
         return Switcher(
-            quant_noise(
-            nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            ),
-            cfg.len_dictionary,
-            cfg.num_lang,
-            active_ffn[1],
-            shared_model=W_ffn2
+                nn.ModuleList([
+                quant_noise(
+                nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
+                ) for _ in range(num)])
         )
 
     def _get_fc_rank(self, remove_num: int) -> List[int]:
@@ -696,17 +691,12 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         self.fc2.bias = torch.nn.Parameter(new_fc2_bias)
         raise ValueError("Not for _prune_fc_layer")
 
-    def build_self_attention(self, embed_dim, active_proj, cfg, K, V, Q, Out_Proj):
+    def build_self_attention(self, embed_dim, expert_num, active_proj):
         return MultiheadAttentionIN(
             embed_dim,
             cfg.encoder.attention_heads,
-            len_dictionary=cfg.len_dictionary,
-            num_lang=cfg.num_lang,
+            expert_num=expert_num,
             active=active_proj,
-            shared_K=K,
-            shared_V=V,
-            shared_Q=Q,
-            shared_out=Out_Proj,
             dropout=cfg.attention_dropout,
             self_attention=True,
             q_noise=self.quant_noise,
@@ -736,7 +726,6 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         x,
         encoder_padding_mask: Optional[Tensor],
         attn_mask: Optional[Tensor] = None,
-        lang_ids = None,
     ):
         """
         Args:
@@ -768,7 +757,6 @@ class TransformerEncoderLayerBaseIN(nn.Module):
             x = self.self_attn_layer_norm(x)
 
         x, _ = self.self_attn(
-            lang_ids=lang_ids,
             query=x,
             key=x,
             value=x,
@@ -786,10 +774,10 @@ class TransformerEncoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
 
-        x = self.fc1(x, lang_ids=lang_ids)
+        x = self.fc1(x)
         x = self.activation_fn(x)
         x = self.activation_dropout_module(x)
-        x = self.fc2(x, lang_ids=lang_ids)
+        x = self.fc2(x)
 
         fc_result = x
 
@@ -824,17 +812,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         cfg, 
         active_proj_self, 
         active_proj_encoder, 
-        active_ffn, 
-        W_ffn1,
-        W_ffn2,
-        K_self,
-        V_self,
-        Q_self,
-        K_encoder,
-        V_encoder,
-        Q_encoder,
-        Out_Proj_self,
-        Out_Proj_encoder,
+        active_ffn,
         no_encoder_attn=False, 
         add_bias_kv=False, 
         add_zero_attn=False
@@ -849,14 +827,11 @@ class TransformerDecoderLayerBaseIN(nn.Module):
 
         self.cross_self_attention = cfg.cross_self_attention
 
+        self.expert_num = cfg.expert_num
         self.self_attn = self.build_self_attention(
             self.embed_dim,
-            cfg,
+            self.expert_num,
             active_proj_self,
-            K_self,
-            V_self,
-            Q_self,
-            Out_Proj_self,
             add_bias_kv=add_bias_kv,
             add_zero_attn=add_zero_attn,
         )
@@ -890,7 +865,7 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             self.encoder_attn = None
             self.encoder_attn_layer_norm = None
         else:
-            self.encoder_attn = self.build_encoder_attention(self.embed_dim, cfg, active_proj_encoder, K_encoder, V_encoder, Q_encoder, Out_Proj_encoder)
+            self.encoder_attn = self.build_encoder_attention(self.embed_dim, self.expert_num, active_proj_encoder)
             self.encoder_attn_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
 
         self.ffn_layernorm = (
@@ -914,18 +889,16 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             cfg.decoder.ffn_embed_dim,
             self.quant_noise,
             self.quant_noise_block_size,
-            cfg,
+            self.expert_num,
             active_ffn,
-            W_ffn1
         )
         self.fc2 = self.build_fc2(
             cfg.decoder.ffn_embed_dim,
             self.embed_dim,
             self.quant_noise,
             self.quant_noise_block_size,
-            cfg,
+            self.expert_num,
             active_ffn,
-            W_ffn2
         )
         
         self.final_layer_norm = LayerNorm(self.embed_dim, export=cfg.export)
@@ -933,40 +906,31 @@ class TransformerDecoderLayerBaseIN(nn.Module):
 
         self.onnx_trace = False
 
-    def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size, cfg, active_ffn, W_ffn1):
+    def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size, expert_num, active_ffn):
+        num = expert_num if active_ffn[0] else 1
         return Switcher(
-            quant_noise(
-            nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            ),
-            cfg.len_dictionary,
-            cfg.num_lang,
-            active_ffn[0],
-            shared_model=W_ffn1
+            nn.ModuleList([
+                quant_noise(
+                nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
+                ) for _ in range(num)])
         )
 
-    def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size, cfg, active_ffn, W_ffn2):
-        return Switcher(quant_noise(
-            nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
-            ),
-            cfg.len_dictionary,
-            cfg.num_lang,
-            active_ffn[1],
-            shared_model=W_ffn2
+    def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size, expert_num, active_ffn):
+        num = expert_num if active_ffn[1] else 1
+        return Switcher(nn.ModuleList([
+                quant_noise(
+                nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size
+                ) for _ in range(num)])
         )
 
     def build_self_attention(
-        self, embed_dim, cfg, active_proj_self, K_self, V_self, Q_self, Out_Proj_self, add_bias_kv=False, add_zero_attn=False,
+        self, embed_dim, expert_num, active_proj_self, add_bias_kv=False, add_zero_attn=False,
     ):
         return MultiheadAttentionIN(
             embed_dim,
             cfg.decoder.attention_heads,
-            len_dictionary=cfg.len_dictionary,
-            num_lang=cfg.num_lang,
+            expert_num=expert_num
             active=active_proj_self,
-            shared_K=K_self,
-            shared_V=V_self,
-            shared_Q=Q_self,
-            shared_out=Out_Proj_self,
             dropout=cfg.attention_dropout,
             add_bias_kv=add_bias_kv,
             add_zero_attn=add_zero_attn,
@@ -975,17 +939,11 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             qn_block_size=self.quant_noise_block_size,
         )
 
-    def build_encoder_attention(self, embed_dim, cfg, active_proj_encoder, K_encoder, V_encoder, Q_encoder, Out_Proj_encoder):
+    def build_encoder_attention(self, embed_dim, expert_num, active_proj_encoder):
         return MultiheadAttentionIN(
             embed_dim,
             cfg.decoder.attention_heads,
-            len_dictionary=cfg.len_dictionary,
-            num_lang=cfg.num_lang,
-            active=active_proj_encoder,
-            shared_K=K_encoder,
-            shared_V=V_encoder,
-            shared_Q=Q_encoder,
-            shared_out=Out_Proj_encoder,
+            expert_num=expert_num,
             kdim=cfg.encoder.embed_dim,
             vdim=cfg.encoder.embed_dim,
             dropout=cfg.attention_dropout,
@@ -1013,7 +971,6 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         self_attn_padding_mask: Optional[torch.Tensor] = None,
         need_attn: bool = False,
         need_head_weights: bool = False,
-        lang_ids = None,
     ):
         """
         Args:
@@ -1070,7 +1027,6 @@ class TransformerDecoderLayerBaseIN(nn.Module):
             y = x
 
         x, attn = self.self_attn(
-            lang_ids=lang_ids,
             query=x,
             key=y,
             value=y,
@@ -1108,7 +1064,6 @@ class TransformerDecoderLayerBaseIN(nn.Module):
                 self.encoder_attn._set_input_buffer(incremental_state, saved_state)
 
             x, attn = self.encoder_attn(
-                lang_ids=lang_ids,
                 query=x,
                 key=encoder_out,
                 value=encoder_out,
@@ -1129,11 +1084,11 @@ class TransformerDecoderLayerBaseIN(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
 
-        x = self.activation_fn(self.fc1(x, lang_ids))
+        x = self.activation_fn(self.fc1(x))
         x = self.activation_dropout_module(x)
         if self.ffn_layernorm is not None:
             x = self.ffn_layernorm(x)
-        x = self.fc2(x, lang_ids)
+        x = self.fc2(x)
         
 
         x = self.dropout_module(x)

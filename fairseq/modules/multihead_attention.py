@@ -651,13 +651,8 @@ class MultiheadAttentionIN(nn.Module):
         self,
         embed_dim,
         num_heads,
-        len_dictionary,
-        num_lang,
+        expert_num,
         active,
-        shared_K,
-        shared_V,
-        shared_Q,
-        shared_out,
         kdim=None,
         vdim=None,
         dropout=0.0,
@@ -693,44 +688,36 @@ class MultiheadAttentionIN(nn.Module):
             "Self-attention requires query, key and " "value to be of the same size"
         )
 
+        num = expert_num if active[0] else 1
         self.k_proj = Switcher(
-            quant_noise(
-            nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size
-            ),
-            len_dictionary,
-            num_lang,
-            active=active[0],
-            shared_model=shared_K
+            nn.ModuleList([
+                quant_noise(
+                nn.Linear(self.kdim, embed_dim, bias=bias), q_noise, qn_block_size
+                ) for _ in range(num)])
         )
 
+        num = expert_num if active[1] else 1
         self.v_proj = Switcher(
-            quant_noise(
-            nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size
-            ),
-            len_dictionary,
-            num_lang,
-            active=active[1],
-            shared_model=shared_V
+            nn.ModuleList([
+                quant_noise(
+                nn.Linear(self.vdim, embed_dim, bias=bias), q_noise, qn_block_size
+                ) for _ in range(num)])
         )
-
+        
+        num = expert_num if active[2] else 1
         self.q_proj = Switcher(
-            quant_noise(
-            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
-            ),
-            len_dictionary,
-            num_lang,
-            active=active[2],
-            shared_model=shared_Q
+            nn.ModuleList([
+                quant_noise(
+                nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+                ) for _ in range(num)])
         )
 
+        num = expert_num if active[3] else 1
         self.out_proj = Switcher(
-            quant_noise(
-            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
-            ),
-            len_dictionary,
-            num_lang,
-            active=active[3],
-            shared_model=shared_out
+            nn.ModuleList([
+                quant_noise(
+                nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+                ) for _ in range(num)])
         )
 
         if add_bias_kv:
@@ -753,39 +740,25 @@ class MultiheadAttentionIN(nn.Module):
         if self.qkv_same_dim:
             # Empirically observed the convergence to be much better with
             # the scaled initialization
-            nn.init.xavier_uniform_(self.k_proj.base_model.weight, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.v_proj.base_model.weight, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.q_proj.base_model.weight, gain=1 / math.sqrt(2))
-            # if self.k_proj.active:
-            #     for i in range(self.k_proj.num_lang):
-            #         nn.init.xavier_uniform_(self.k_proj.W[i].weight, gain=1 / math.sqrt(2))
-            # if self.v_proj.active:
-            #     for i in range(self.v_proj.num_lang):
-            #         nn.init.xavier_uniform_(self.v_proj.W[i].weight, gain=1 / math.sqrt(2))
-            # if self.q_proj.active:
-            #     for i in range(self.q_proj.num_lang):
-            #         nn.init.xavier_uniform_(self.q_proj.W[i].weight, gain=1 / math.sqrt(2))
+            for i in range(self.k_proj.expert_num):
+                nn.init.xavier_uniform_(self.k_proj.base_model[i].weight, gain=1 / math.sqrt(2))
+            for i in range(self.v_proj.expert_num):
+                nn.init.xavier_uniform_(self.v_proj.base_model[i].weight, gain=1 / math.sqrt(2))
+            for i in range(self.q_proj.expert_num):
+                nn.init.xavier_uniform_(self.q_proj.base_model[i].weight, gain=1 / math.sqrt(2))
         else:
-            nn.init.xavier_uniform_(self.k_proj.base_model.weight)
-            nn.init.xavier_uniform_(self.v_proj.base_model.weight)
-            nn.init.xavier_uniform_(self.q_proj.base_model.weight)
-            # if self.k_proj.active:
-            #     for i in range(self.k_proj.num_lang):
-            #         nn.init.xavier_uniform_(self.k_proj.W[i].weight)
-            # if self.v_proj.active:
-            #     for i in range(self.v_proj.num_lang):
-            #         nn.init.xavier_uniform_(self.v_proj.W[i].weight)
-            # if self.q_proj.active:
-            #     for i in range(self.q_proj.num_lang):
-            #         nn.init.xavier_uniform_(self.q_proj.W[i].weight)
+            for i in range(self.k_proj.expert_num):
+                nn.init.xavier_uniform_(self.k_proj.base_model[i].weight)
+            for i in range(self.v_proj.expert_num):
+                nn.init.xavier_uniform_(self.v_proj.base_model[i].weight)
+            for i in range(self.q_proj.expert_num):
+                nn.init.xavier_uniform_(self.q_proj.base_model[i].weight)
 
-        nn.init.xavier_uniform_(self.out_proj.base_model.weight)
-        # if self.out_proj.active:
-        #     for i in range(self.out_proj.num_lang):
-        #         nn.init.xavier_uniform_(self.out_proj.W[i].weight)
+        for i in range(self.out_proj.expert_num):
+            nn.init.xavier_uniform_(self.out_proj.base_model[i].weight)
+            if self.out_proj.base_model[i].bias is not None:
+                nn.init.constant_(self.out_proj.base_model[i].bias, 0.0)
 
-        if self.out_proj.base_model.bias is not None:
-            nn.init.constant_(self.out_proj.base_model.bias, 0.0)
         if self.bias_k is not None:
             nn.init.xavier_normal_(self.bias_k)
         if self.bias_v is not None:
@@ -924,7 +897,6 @@ class MultiheadAttentionIN(nn.Module):
 
     def forward(
         self,
-        lang_ids,
         query,
         key: Optional[Tensor],
         value: Optional[Tensor],
@@ -1007,7 +979,6 @@ class MultiheadAttentionIN(nn.Module):
                 q_proj_weight=self.q_proj,
                 k_proj_weight=self.k_proj,
                 v_proj_weight=self.v_proj,
-                lang_ids=lang_ids
             )
 
         if incremental_state is not None:
@@ -1022,24 +993,24 @@ class MultiheadAttentionIN(nn.Module):
             saved_state = None
 
         if self.self_attention:
-            q = self.q_proj(query, lang_ids)
-            k = self.k_proj(query, lang_ids)
-            v = self.v_proj(query, lang_ids)
+            q = self.q_proj(query)
+            k = self.k_proj(query)
+            v = self.v_proj(query)
         elif self.encoder_decoder_attention:
             # encoder-decoder attention
-            q = self.q_proj(query, lang_ids)
+            q = self.q_proj(query)
             if key is None:
                 assert value is None
                 k = v = None
             else:
-                k = self.k_proj(key, lang_ids)
-                v = self.v_proj(key, lang_ids)
+                k = self.k_proj(key)
+                v = self.v_proj(key)
 
         else:
             assert key is not None and value is not None
-            q = self.q_proj(query, lang_ids)
-            k = self.k_proj(key, lang_ids)
-            v = self.v_proj(value, lang_ids)
+            q = self.q_proj(query)
+            k = self.k_proj(key)
+            v = self.v_proj(value)
         q *= self.scaling
 
         if self.bias_k is not None:
@@ -1191,7 +1162,7 @@ class MultiheadAttentionIN(nn.Module):
             attn = attn.contiguous().view(tgt_len, bsz, self.embed_dim)
         else:
             attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, self.embed_dim)
-        attn = self.out_proj(attn, lang_ids)
+        attn = self.out_proj(attn)
         attn_weights: Optional[Tensor] = None
         if need_weights:
             attn_weights = attn_weights_float.view(
