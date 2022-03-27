@@ -88,6 +88,7 @@ class TransformerModel(TransformerModelBase):
         gen_parser_from_dataclass(
             parser, TransformerConfig(), delete_default=True, with_prefix=""
         )
+        parser.add_argument('--expert_num', type=int, default=1, metavar='D')
 
     @classmethod
     def build_model(cls, args, task):
