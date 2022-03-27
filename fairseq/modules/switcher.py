@@ -28,11 +28,19 @@ class Switcher(nn.Module):
                 expert_id = torch.randint(low=0, high=self.expert_num, size=(1,)).item()
                 x = self.base_model[expert_id](x)
         else:
-            results = []
-            for expert_id in range(self.expert_num):
-                results.append(self.base_model[expert_id](x))
-            results = torch.stack(results)
-            x = results.mean(dim=0)
+            if self.expert_num == 1:
+                x = self.base_model[0](x)
+            else:
+                results = []
+                for expert_id in range(self.expert_num):
+                    results.append(self.base_model[expert_id](x))
+                results = torch.stack(results, dim=0)
+                x = results.mean(dim=0)
+                # mask = torch.randint(0, self.expert_num, size=(results.size(1),), device=results.device)
+                # for i in range(self.expert_num):
+                #     expert_mask = mask.eq(i)
+                #     results[i] *= expert_mask.unsqueeze(-1).unsqueeze(-1)
+                # x = results.sum(0)
         return x
 
 class Mapper(nn.Module):

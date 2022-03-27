@@ -27,6 +27,7 @@ from .transformer_legacy import (
     transformer_wmt_en_de_big_t2t,
 )
 from .transformer_base import TransformerModelBase, Embedding, TransformerModelBaseIN
+from .transformer_thor import ThorTransformerDecoder, ThorTransformerEncoder
 
 
 __all__ = [
@@ -53,4 +54,7 @@ __all__ = [
     "DEFAULT_MAX_SOURCE_POSITIONS",
     "DEFAULT_MAX_TARGET_POSITIONS",
     "DEFAULT_MIN_PARAMS_TO_WRAP",
+    "base_architecture_thor",
+    "thor_transformer_iwslt_de_en",
+    "thor_transformer_vaswani_wmt_en_de_big",
 ]

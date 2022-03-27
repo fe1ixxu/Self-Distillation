@@ -53,6 +53,7 @@ from .positional_encoding import (
 from .mixture_of_experts import MoE, HeirarchicalMoE, Experts
 from .attention_forward import multi_head_attention_forward
 from .switcher import Switcher
+from .transformer_thor_layer import ThorTransformerEncoderLayer, ThorTransformerDecoderLayer
 
 __all__ = [
     "AdaptiveInput",
