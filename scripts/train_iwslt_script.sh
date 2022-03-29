@@ -90,3 +90,26 @@ conda activate mmt
 # --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/ \
 # --switcher-proj 0 --switcher-fc 1 --switcher-encoder 0 --switcher-decoder 0 --switcher-hidden-size 0
 
+lg=${1}
+
+SAVE_DIR=../checkpoints/iwslt_new_512/base/many-to-one-${lg}/
+fairseq-train ../data/iwslt14/data-bin-${lg}/ --arch transformer_iwslt_de_en --task translation \
+--criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1000 --max-update 16000 --dropout 0.3 --attention-dropout 0.1 \
+--weight-decay 0.0001 --max-tokens 8192 --update-freq 2 --keep-interval-updates 1 \
+--save-interval-updates 300 --no-epoch-checkpoints --log-format simple --log-interval 100 \
+--ddp-backend no_c10d --fp16  --fp16-init-scale 16 \
+--save-dir ${SAVE_DIR} --max-source-positions 512 --max-target-positions 512 \
+--skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/
+
+expert_num=1
+SAVE_DIR=../checkpoints/iwslt_new_512/expert-${expert_num}-5.0-no-adaptive/many-to-one-${lg}/
+fairseq-train ../data/iwslt14/data-bin-${lg}/ --arch transformer_iwslt_de_en_IN --task translation_v_expert_single \
+--expert-num ${expert_num}  --consistency-alpha 5.0  --adaptive-consistency-alpha 0 --max-updates-train 16000 --max-update 16000 \
+--criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1000  --dropout 0.3 --attention-dropout 0.1 \
+--weight-decay 0.0001 --max-tokens 8192 --update-freq 2 --keep-interval-updates 1 --patience 20 \
+--save-interval-updates 300 --no-epoch-checkpoints --log-format simple --log-interval 100 \
+--ddp-backend no_c10d --fp16  --fp16-init-scale 16 \
+--save-dir ${SAVE_DIR} --max-source-positions 512 --max-target-positions 512 \
+--skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/

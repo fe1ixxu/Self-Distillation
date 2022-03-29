@@ -316,7 +316,8 @@ MODEL_PATH=$1
 # done
 
 DATA_DIR=../data/iwslt14/
-for lg in de; do
+lang=${2}
+for lg in $lang; do
 # MODEL_PATH=../checkpoints/iwslt_new2/thor_base_${lg}/many-to-one/
 for SRC in ${lg}; do
     TGT=en
@@ -333,6 +334,6 @@ for SRC in ${lg}; do
     grep -P "^H" | cut -f 3- > $FOUT
 
     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
-
+    head ${FOUT}.bleu
 done
 done
