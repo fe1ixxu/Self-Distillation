@@ -38,6 +38,17 @@ class TranslationVExpertConfig(TranslationConfig):
         default=0.5,
         metadata={"help": "weight of the consistency loss"},
     )
+    adaptive_consistency_alpha: int = field(
+        default=0,
+        metadata={"help": "whether use adaptive consistency method"},
+    )
+    
+    ## This is a lasy implementation
+    max_updates_train: int = field(
+        default=25000,
+        metadata={"help": "whether use adaptive consistency method"},
+    )
+
 
 @register_task("translation_v_expert_single", dataclass=TranslationVExpertConfig)
 class Translation_V_Expert_Single(TranslationTask):
@@ -124,7 +135,9 @@ class Translation_V_Expert_Single(TranslationTask):
 
         pad_mask = sample["target"].eq(criterion.padding_idx)
         consistency_loss = symmetric_KL_loss(logits1, logits2, pad_mask)
-        loss = loss1 + loss2 + consistency_loss * self.cfg.consistency_alpha
+
+        consistency_alpha = self._get_consistency_alpha(self.cfg.consistency_alpha, update_num, self.cfg.max_updates_train)
+        loss = loss1 + loss2 + consistency_loss * consistency_alpha
 
         logging_output = {
             "loss": torch.tensor([logging_output1["loss"], logging_output2["loss"]]),
@@ -133,8 +146,12 @@ class Translation_V_Expert_Single(TranslationTask):
             "nsentences": sample["target"].size(0),
             "sample_size": sample_size,
             "consistency": consistency_loss.data,
+            "consistency_alpha": consistency_alpha,
+            "update_num": update_num,
         }
 
+        if update_num % 100 == 0:
+            print(consistency_alpha, update_num)
         if ignore_grad:
             loss *= 0
 
@@ -151,3 +168,12 @@ class Translation_V_Expert_Single(TranslationTask):
         metrics.log_scalar(
             "consistency", loss_sum / sample_size / math.log(2), sample_size, round=3
         )
+
+    def _get_consistency_alpha(self, alpha, num_update, max_update):
+        if num_update >= max_update / 2 or not self.cfg.adaptive_consistency_alpha:
+            return alpha
+        else:
+            alpha = torch.tensor([alpha])
+            gamma = torch.log(1/alpha) / torch.log(torch.tensor([2/5])) # log_0.4(1/alpha)
+            cofficient = ( 2**gamma * alpha * num_update ** gamma) / (max_update ** gamma)
+            return cofficient.item()

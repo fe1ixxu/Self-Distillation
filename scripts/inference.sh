@@ -327,7 +327,7 @@ for SRC in ${lg}; do
 
     cat $FSRC | \
     CUDA_VISIBLE_DEVICES=6 fairseq-interactive ${DATA_DIR}/data-bin-${lg} \
-        --task translation --path $MODEL_PATH/checkpoint_best.pt \
+        --path $MODEL_PATH/checkpoint_best.pt \
         --buffer-size 1024 --batch-size 100 \
         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece | \
     grep -P "^H" | cut -f 3- > $FOUT

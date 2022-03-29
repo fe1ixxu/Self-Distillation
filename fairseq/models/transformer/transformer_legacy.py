@@ -222,6 +222,7 @@ class TransformerModelIN(TransformerModelBaseIN):
         )
         parser.add_argument('--expert-num', type=int, default=1, metavar='D')
         parser.add_argument('--consistency-alpha', type=float, default=5.0, metavar='D')
+        parser.add_argument('--adaptive-consistency-alpha', type=int, default=0, metavar='D')
         
     @classmethod
     def build_model(cls, args, task):

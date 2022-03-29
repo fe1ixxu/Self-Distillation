@@ -405,7 +405,7 @@ class TransformerEncoderBaseIN(FairseqEncoder):
             self.layers = nn.ModuleList([])
         ## k,v,q,out_proj
         active_proj = [
-                [0,1,0,1] if i % 2 == 0 else [0,0,0,0] \
+                [0,0,0,0] if i % 2 == 0 else [0,0,0,0] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2

@@ -558,12 +558,12 @@ class TransformerDecoderBaseIN(FairseqIncrementalDecoder):
         self.cross_self_attention = cfg.cross_self_attention
         ## k,v,q,out_proj
         active_proj_self = [
-                [0,1,0,1] if i % 2 == 0 else [0,0,0,0] \
+                [0,0,0,0] if i % 2 == 0 else [0,0,0,0] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## k,v,q,out_proj
         active_proj_encoder = [
-                [0,1,0,1] if i % 2 == 0 else [0,0,0,0] \
+                [0,0,0,0] if i % 2 == 0 else [0,0,0,0] \
                 for i in range(cfg.encoder.layers)                
             ]
         ## fc1, fc2
