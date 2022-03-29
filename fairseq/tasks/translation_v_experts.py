@@ -150,8 +150,6 @@ class Translation_V_Expert_Single(TranslationTask):
             "update_num": update_num,
         }
 
-        if update_num % 100 == 0:
-            print(consistency_alpha, update_num)
         if ignore_grad:
             loss *= 0
 
