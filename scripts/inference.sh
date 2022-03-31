@@ -315,25 +315,46 @@ MODEL_PATH=$1
 
 # done
 
-DATA_DIR=../data/iwslt14/
-lang=${2}
-for lg in $lang; do
-# MODEL_PATH=../checkpoints/iwslt_new2/thor_base_${lg}/many-to-one/
-for SRC in ${lg}; do
-    TGT=en
-    FSRC=${DATA_DIR}/tok-${lg}/test.${SRC}
-    FTGT=${DATA_DIR}/preprocessed/${SRC}/test.${TGT}
-    FOUT=${MODEL_PATH}/results/test.${SRC}-${TGT}.${TGT}
-    mkdir -p ${MODEL_PATH}/results
+# DATA_DIR=../data/iwslt14/
+# lang=${2}
+# for lg in $lang; do
+# # MODEL_PATH=../checkpoints/iwslt_new2/thor_base_${lg}/many-to-one/
+# for SRC in ${lg}; do
+#     TGT=en
+#     FSRC=${DATA_DIR}/tok-${lg}/test.${SRC}
+#     FTGT=${DATA_DIR}/preprocessed/${SRC}/test.${TGT}
+#     FOUT=${MODEL_PATH}/results/test.${SRC}-${TGT}.${TGT}
+#     mkdir -p ${MODEL_PATH}/results
 
-    cat $FSRC | \
-    CUDA_VISIBLE_DEVICES=6 fairseq-interactive ${DATA_DIR}/data-bin-${lg} \
-        --path $MODEL_PATH/checkpoint_best.pt \
-        --buffer-size 1024 --batch-size 100 \
-        --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece | \
-    grep -P "^H" | cut -f 3- > $FOUT
+#     cat $FSRC | \
+#     CUDA_VISIBLE_DEVICES=6 fairseq-interactive ${DATA_DIR}/data-bin-${lg} \
+#         --path $MODEL_PATH/checkpoint_best.pt \
+#         --buffer-size 1024 --batch-size 100 \
+#         --beam 5 --lenpen 1.0 --remove-bpe=sentencepiece | \
+#     grep -P "^H" | cut -f 3- > $FOUT
 
-    cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
-    head ${FOUT}.bleu
-done
-done
+#     cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
+#     head ${FOUT}.bleu
+# done
+# done
+
+
+
+### WMT14:
+DATA_DIR=../data/wmt14/
+SRC=en
+TGT=de
+FSRC=${DATA_DIR}/tok/test.${SRC}
+FTGT=${DATA_DIR}/wmt14_en_de/test.${TGT}
+FOUT=${MODEL_PATH}/results/test.${SRC}-${TGT}.${TGT}
+mkdir -p ${MODEL_PATH}/results
+
+cat $FSRC | \
+python fairseq_cli/interactive.py ${DATA_DIR}/data-bin \
+    --path $MODEL_PATH/checkpoint_best.pt \
+    --buffer-size 1024 --batch-size 100 \
+    --beam 4 --lenpen 0.6 --remove-bpe=sentencepiece --no-progress-bar | \
+grep -P "^H" | cut -f 3- > $FOUT
+
+cat ${FOUT} | sacrebleu $FTGT -m bleu -b -w 2 > ${FOUT}.bleu
+head ${FOUT}.bleu

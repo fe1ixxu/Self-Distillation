@@ -499,3 +499,7 @@ def transformer_vaswani_wmt_en_de_big_IN(args):
     args.decoder_attention_heads = getattr(args, "decoder_attention_heads", 16)
     args.dropout = getattr(args, "dropout", 0.3)
     base_architecture_IN(args)
+
+@register_model_architecture("transformer_IN", "transformer_wmt_en_de_IN")
+def transformer_wmt_en_de_IN(args):
+    base_architecture_IN(args)

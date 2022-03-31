@@ -35,7 +35,7 @@ def symmetric_KL_loss(p, q, pad_mask):
 @dataclass
 class TranslationVExpertConfig(TranslationConfig):
     consistency_alpha: float = field(
-        default=0.5,
+        default=5.0,
         metadata={"help": "weight of the consistency loss"},
     )
     adaptive_consistency_alpha: int = field(
@@ -48,6 +48,17 @@ class TranslationVExpertConfig(TranslationConfig):
         default=25000,
         metadata={"help": "whether use adaptive consistency method"},
     )
+
+    temperature_q: int = field(
+        default=5,
+        metadata={"help": "alpha get 1 at the step of N/temperature_q"},
+    )
+
+    temperature_p: int = field(
+        default=2,
+        metadata={"help": "alpha get max at the step of N/temperature_p"},
+    )
+
 
 
 @register_task("translation_v_expert_single", dataclass=TranslationVExpertConfig)
@@ -137,6 +148,8 @@ class Translation_V_Expert_Single(TranslationTask):
         consistency_loss = symmetric_KL_loss(logits1, logits2, pad_mask)
 
         consistency_alpha = self._get_consistency_alpha(self.cfg.consistency_alpha, update_num, self.cfg.max_updates_train)
+        if update_num % 1000 == 0:
+            print(consistency_alpha)
         loss = loss1 + loss2 + consistency_loss * consistency_alpha
 
         logging_output = {
@@ -168,10 +181,10 @@ class Translation_V_Expert_Single(TranslationTask):
         )
 
     def _get_consistency_alpha(self, alpha, num_update, max_update):
-        if num_update >= max_update / 2 or not self.cfg.adaptive_consistency_alpha:
+        if num_update >= max_update / self.cfg.temperature_p or not self.cfg.adaptive_consistency_alpha:
             return alpha
         else:
             alpha = torch.tensor([alpha])
-            gamma = torch.log(1/alpha) / torch.log(torch.tensor([2/5])) # log_0.4(1/alpha)
-            cofficient = ( 2**gamma * alpha * num_update ** gamma) / (max_update ** gamma)
+            gamma = torch.log(1/alpha) / torch.log(torch.tensor([self.cfg.temperature_p/self.cfg.temperature_q])) # log_(p/q)(1/alpha)
+            cofficient = ( self.cfg.temperature_p**gamma * alpha * num_update ** gamma) / (max_update ** gamma)
             return cofficient.item()
