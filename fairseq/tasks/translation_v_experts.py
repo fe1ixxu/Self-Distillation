@@ -49,12 +49,12 @@ class TranslationVExpertConfig(TranslationConfig):
         metadata={"help": "whether use adaptive consistency method"},
     )
 
-    temperature_q: int = field(
+    temperature_q: float = field(
         default=5,
         metadata={"help": "alpha get 1 at the step of N/temperature_q"},
     )
 
-    temperature_p: int = field(
+    temperature_p: float = field(
         default=2,
         metadata={"help": "alpha get max at the step of N/temperature_p"},
     )
