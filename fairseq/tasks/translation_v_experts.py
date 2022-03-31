@@ -168,6 +168,34 @@ class Translation_V_Expert_Single(TranslationTask):
 
         with torch.autograd.profiler.record_function("backward"):
             optimizer.backward(loss)
+
+        if update_num % 200 == 0:
+            recorder = {}
+            all_score = []
+            for name, params in model.named_parameters():
+                
+                if "layer_norm" not in name and "bias" not in name:
+                    recorder[name]={}
+                    grad = params.grad.clone().detach().view(-1)
+                    params = params.clone().detach().view(-1)
+                    score = torch.abs(grad*params)
+
+                    recorder[name] = {
+                        'scores': torch.mean(score).item()
+                    }
+                    score = score.to("cpu")
+                    all_score.append(score)
+                    score = score.type(torch.float32)
+                    print(name, torch.mean(score).item())
+            all_score = torch.cat(all_score, dim=-1).type(torch.float32)
+            print(all_score.shape)
+            recorder["mean"] = torch.mean(all_score).item()
+            recorder["var"] = torch.var(all_score).item()
+            
+            print(f"Mean score of the model is {recorder['mean']}")
+            print(f"Mean var of the model is {recorder['var']}")
+
+        exit(0)
         return loss, sample_size, logging_output
 
     def reduce_metrics(self, logging_outputs, criterion):
