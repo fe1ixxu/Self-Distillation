@@ -296,6 +296,10 @@ def train(
 
     valid_subsets = cfg.dataset.valid_subset.split(",")
     should_stop = False
+    # end_of_epoch = not itr.has_next()
+    # valid_losses, should_stop = validate_and_save(
+    #     cfg, trainer, task, epoch_itr, valid_subsets, end_of_epoch
+    # )
     num_updates = trainer.get_num_updates()
     logger.info("Start iterating over samples")
     for i, samples in enumerate(progress):
@@ -487,7 +491,7 @@ def validate(
 
         if hasattr(task, "post_validate"):
             task.post_validate(trainer.get_model(), stats, agg)
-
+        print(f"Valid loss is {stats['loss']} at {trainer.get_num_updates()}")
         progress.print(stats, tag=subset, step=trainer.get_num_updates())
 
         valid_losses.append(stats[cfg.checkpoint.best_checkpoint_metric])

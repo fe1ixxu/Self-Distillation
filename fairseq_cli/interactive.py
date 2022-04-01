@@ -150,7 +150,15 @@ def main(cfg: FairseqConfig):
         strict=(cfg.checkpoint.checkpoint_shard_count == 1),
         num_shards=cfg.checkpoint.checkpoint_shard_count,
     )
-
+    
+    print(len(models))
+    inds = torch.load("../analysis/ind_30")
+    for name, params in models[0].named_parameters():
+        ind = inds[name]
+        if len(ind) > 0:
+            params = params.data
+            params = params.view(-1)
+            params[ind] = 0.
     # Set dictionaries
     src_dict = task.source_dictionary
     tgt_dict = task.target_dictionary

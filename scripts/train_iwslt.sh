@@ -165,10 +165,10 @@ conda activate mmt
 # --switcher-hidden-size ${hidden_size}
 lg=de
 
-SAVE_DIR=../checkpoints/iwslt_new_512/base/many-to-one-${lg}-analysis2/
+SAVE_DIR=../checkpoints/iwslt_new_512/base/many-to-one-${lg}/
 fairseq-train ../data/iwslt14/data-bin-${lg}/ --arch transformer_iwslt_de_en --task translation \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
---lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1000 --max-update 16000 --dropout 0.3 --attention-dropout 0.1 \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1000 --max-update 16000 --dropout 0. --attention-dropout 0. \
 --weight-decay 0.0001 --max-tokens 8192 --update-freq 2 --keep-interval-updates 1 \
 --save-interval-updates 300 --no-epoch-checkpoints --log-format simple --log-interval 100 \
 --ddp-backend no_c10d --fp16  --fp16-init-scale 16 \

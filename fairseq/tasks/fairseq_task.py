@@ -515,29 +515,48 @@ class FairseqTask(object):
         with torch.autograd.profiler.record_function("backward"):
             optimizer.backward(loss)
         
-        if update_num % 200 == 0:
+        if True: #update_num % 70 == 0:
             recorder = {}
             all_score = []
             for name, params in model.named_parameters():
                 
-                if "layer_norm" not in name:
-                    recorder[name]={}
-                    grad = params.grad.clone().detach().view(-1)
-                    params = params.clone().detach().view(-1)
-                    score = torch.abs(grad*params)
+                # if "layer_norm" not in name:
+                recorder[name]={}
+                grad = params.grad.clone().detach().view(-1)
+                params = params.clone().detach().view(-1)
+                score = torch.abs(grad*params)
 
-                    recorder[name] = {
-                        'scores': torch.mean(score).item()
-                    }
-                    score = score.to("cpu")
-                    score, _ = torch.sort(score)
-                    need = len(score) * 0.1
-                    score = score[int(need): -int(need)]
-                    all_score.append(score)
-                    # score = score.type(torch.float32)
-                    # print(name, torch.mean(score).item())
+                score = score.to("cpu")
+                ind = (score < 0.5).nonzero().view(-1).to("cpu")
+                # print(f"gradients: {grad[ind].to('cpu')}")
+                # print(f"parameters: {params[ind].to('cpu')}")
+
+                recorder[name] = ind
+                # score, _ = torch.sort(score)
+                # need = len(score) * 0.025
+                # score = score[int(need): -int(need)]
+                all_score.append(score)
+                # score = score.type(torch.float32)
+                # print(name, torch.mean(score).item())
+            torch.save(recorder, "../analysis/ind_30")
             all_score = torch.cat(all_score, dim=-1).type(torch.float32)
-            print(all_score.shape)
+            t1, _ = all_score.topk(10000)
+            t2, _ = (-all_score).topk(10000)
+            # torch.save(all_score, "../analysis/a_base")
+            exit(0)
+            
+
+
+
+            need = int(len(all_score) * 0.05)
+            _, ind1 = all_score.topk(need)
+            _, ind2 = (-all_score).topk(need)
+            ind = torch.cat([ind1, ind2], dim=-1)
+            all_score[ind] = -5201314
+            ind = (all_score!=-5201314).nonzero().view(-1)
+            all_score = all_score[ind]
+            
+            print(all_score.shape, update_num)
             recorder["mean"] = torch.mean(all_score).item()
             recorder["var"] = torch.var(all_score).item()
             
