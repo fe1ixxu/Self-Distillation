@@ -530,9 +530,12 @@ class FairseqTask(object):
                         'scores': torch.mean(score).item()
                     }
                     score = score.to("cpu")
+                    score, _ = torch.sort(score)
+                    need = len(score) * 0.1
+                    score = score[int(need): -int(need)]
                     all_score.append(score)
-                    score = score.type(torch.float32)
-                    print(name, torch.mean(score).item())
+                    # score = score.type(torch.float32)
+                    # print(name, torch.mean(score).item())
             all_score = torch.cat(all_score, dim=-1).type(torch.float32)
             print(all_score.shape)
             recorder["mean"] = torch.mean(all_score).item()
@@ -540,8 +543,6 @@ class FairseqTask(object):
             
             print(f"Mean score of the model is {recorder['mean']}")
             print(f"Mean var of the model is {recorder['var']}")
-
-        exit(0)
     
         return loss, sample_size, logging_output
 
