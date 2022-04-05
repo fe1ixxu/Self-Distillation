@@ -32,6 +32,35 @@ def symmetric_KL_loss(p, q, pad_mask):
     loss = (p - q) * (torch.log(p) - torch.log(q))
     return 0.5 * loss.sum()
 
+def resistor_KL_loss(p, q, pad_mask):
+    """ symmetric KL-divergence 1/2*(KL(p||q)+KL(q||p)) """
+    p, q, pad_mask = p.float(), q.float(), pad_mask.view(-1)
+    dict_size = q.size(-1)
+    non_pad_mask = ~pad_mask
+    p = p.view(-1, dict_size)[non_pad_mask]
+    q = q.view(-1, dict_size)[non_pad_mask]
+    # kl1 = p * (torch.log(p) - torch.log(q))
+    # kl2 = q * (torch.log(q) - torch.log(p))
+    # loss = 1 / (1/p + 1/q)
+    loss = (p-q)**2
+    return loss.sum()
+
+def Topsoe_loss(logits, pad_mask):
+    pad_mask = pad_mask.view(-1)
+    non_pad_mask = ~pad_mask
+    dict_size = logits[0].size(-1)
+
+    m = sum(logits) / len(logits)
+    m = m.float().view(-1, dict_size)[non_pad_mask]
+
+    kl_all = 0
+    for l in logits:
+        l = l.float().view(-1, dict_size)[non_pad_mask]
+        d = (l-m) * (torch.log(l) - torch.log(m))
+        kl_all += d.sum()
+    return kl_all / len(logits)
+
+
 @dataclass
 class TranslationVExpertConfig(TranslationConfig):
     consistency_alpha: float = field(
@@ -57,6 +86,11 @@ class TranslationVExpertConfig(TranslationConfig):
     temperature_p: float = field(
         default=2,
         metadata={"help": "alpha get max at the step of N/temperature_p"},
+    )
+
+    num_iter: int = field(
+        default=2,
+        metadata={"help": "Number of times go through the model"},
     )
 
 
@@ -136,31 +170,30 @@ class Translation_V_Expert_Single(TranslationTask):
         model.train()
         model.set_num_updates(update_num)
 
-        with torch.autograd.profiler.record_function("forward"):
-            with torch.cuda.amp.autocast(enabled=(isinstance(optimizer, AMPOptimizer))):
-                loss1, logits1, sample_size, logging_output1 = self._get_loss(sample, model, criterion)
+        losses, logits, logging_outputs = [], [], []
 
-        with torch.autograd.profiler.record_function("forward"):
-            with torch.cuda.amp.autocast(enabled=(isinstance(optimizer, AMPOptimizer))):
-                loss2, logits2, sample_size, logging_output2 = self._get_loss(sample, model, criterion)
+        for _ in range(self.cfg.num_iter):
+            with torch.autograd.profiler.record_function("forward"):
+                with torch.cuda.amp.autocast(enabled=(isinstance(optimizer, AMPOptimizer))):
+                    loss, logit, sample_size, logging_output = self._get_loss(sample, model, criterion)
+                    losses.append(loss)
+                    logits.append(logit)
+                    logging_outputs.append(logging_output)
 
         pad_mask = sample["target"].eq(criterion.padding_idx)
-        consistency_loss = symmetric_KL_loss(logits1, logits2, pad_mask)
+        consistency_loss = Topsoe_loss(logits, pad_mask)
 
         consistency_alpha = self._get_consistency_alpha(self.cfg.consistency_alpha, update_num, self.cfg.max_updates_train)
-        if update_num % 1000 == 0:
-            print(consistency_alpha)
-        loss = loss1 + loss2 + consistency_loss * consistency_alpha
-
+        loss = sum(losses)/len(losses) + consistency_loss * consistency_alpha
+        
         logging_output = {
-            "loss": torch.tensor([logging_output1["loss"], logging_output2["loss"]]),
-            "nll_loss": torch.tensor([logging_output1["nll_loss"], logging_output2["nll_loss"]]),
+            "loss": torch.tensor([log["loss"] for log in logging_outputs]),
+            "nll_loss": torch.tensor([log["nll_loss"] for log in logging_outputs]),
             "ntokens": sample["ntokens"],
             "nsentences": sample["target"].size(0),
             "sample_size": sample_size,
             "consistency": consistency_loss.data,
             "consistency_alpha": consistency_alpha,
-            "update_num": update_num,
         }
 
         if ignore_grad:
@@ -176,12 +209,14 @@ class Translation_V_Expert_Single(TranslationTask):
         # follows the reduce_metrics() function in label_smoothed_cross_entropy.py
         loss_sum = sum(log.get("consistency", 0) for log in logging_outputs)
         sample_size = sum(log.get("sample_size", 0) for log in logging_outputs)
+        consistency_alpha = sum(log.get("consistency_alpha", 0) for log in logging_outputs)
         metrics.log_scalar(
             "consistency", loss_sum / sample_size / math.log(2), sample_size, round=3
         )
+        metrics.log_scalar("consistency_alpha", consistency_alpha, 0, round=5)
 
     def _get_consistency_alpha(self, alpha, num_update, max_update):
-        if num_update >= max_update / self.cfg.temperature_p or not self.cfg.adaptive_consistency_alpha:
+        if num_update >= max_update / self.cfg.temperature_p or not self.cfg.adaptive_consistency_alpha or alpha <= 1:
             return alpha
         else:
             alpha = torch.tensor([alpha])
