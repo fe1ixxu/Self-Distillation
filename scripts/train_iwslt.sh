@@ -176,11 +176,10 @@ lg=${1}
 # --skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/
 num_iter=${2}
 consis=${3}
-expert_num=1
 # rm -rf ../checkpoints/iwslt_new_512/expert-${expert_num}-5.0-resistor/
-SAVE_DIR=../checkpoints/iwslt_new_512/sd/many-to-one-${lg}-${num_iter}-${consis}/
-fairseq-train ../data/iwslt14/data-bin-${lg}/ --arch transformer_iwslt_de_en_IN --task translation_v_expert_single \
---expert-num ${expert_num}  --consistency-alpha ${consis}  --adaptive-consistency-alpha 1 --max-updates-train 30000 --max-update 30000 --num-iter ${num_iter} \
+SAVE_DIR=../checkpoints/iwslt_new_512/sd/many-to-one-${lg}-${num_iter}-${consis}-tmp/
+fairseq-train ../data/iwslt14/data-bin-${lg}/ --arch transformer_iwslt_de_en --task translation_v_expert_single \
+--consistency-alpha ${consis}  --adaptive-consistency-alpha 1 --max-updates-train 30000 --max-update 30000 --num-iter ${num_iter} \
 --temperature-q 6 --temperature-p 3.75 \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
 --lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 1000  --dropout 0.3 --attention-dropout 0.1 \
