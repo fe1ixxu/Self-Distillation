@@ -1,3 +1,27 @@
+```
+conda create -n sd python=3.8
+pip install -e ./
+pip install tensorboardX
+pip install sentencepiece
+
+data:/export/c12/haoranxu/MMT/data/wmt17/data-bin
+```
+
+
+```
+SAVE_DIR=../checkpoints/wmt17/self-dis-large-3-5/en-de/
+fairseq-train ../data/wmt17/data-bin/ --arch transformer_vaswani_wmt_en_de_big_IN --task translation_v_expert_single \
+--expert-num 1  --consistency-alpha 5.0  --adaptive-consistency-alpha 1 --max-updates-train 80000 --max-update 80000 --num-iter 3 \
+--temperature-p 10 --temperature-q 16 \
+--criterion label_smoothed_cross_entropy --label-smoothing 0.1 --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+--lr-scheduler inverse_sqrt --lr 0.0005 --warmup-updates 4000  --dropout 0.3 --attention-dropout 0.1 \
+--weight-decay 0.0001 --max-tokens 4096 --update-freq 16 --keep-interval-updates 1 \
+--save-interval-updates 300 --no-epoch-checkpoints  \
+--ddp-backend no_c10d --fp16  --fp16-init-scale 16 \
+--save-dir ${SAVE_DIR} --max-source-positions 512 --max-target-positions 512 \
+--skip-invalid-size-inputs-valid-test --tensorboard-logdir ${SAVE_DIR}/log/
+```
+
 <p align="center">
   <img src="docs/fairseq_logo.png" width="150">
   <br />
